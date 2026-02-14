@@ -63,8 +63,8 @@ public class ChessEngine : MonoBehaviour
                 // Main AI Loop
                 ChessAgent agent = agents[turn];
                 agent.setState(gameState);
-                string move = agent.getMove();
-                UpdateState(move);
+                int[] move = agent.getMove();
+                Move(move[0],move[1]);
                 turn = turn ^ 1;
                 board.setState(gameState);
             }   
@@ -75,8 +75,8 @@ public class ChessEngine : MonoBehaviour
         yield return new WaitForSeconds(timeDelay);
     }
 
-    private void UpdateState(string move)
+    public bool Move(int start,int target)
     {
-        
+        return true;
     }
 }

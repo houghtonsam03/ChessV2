@@ -15,7 +15,7 @@ public abstract class ChessAgent : MonoBehaviour
     {
         gameState = state;
     }
-    public string getMove()
+    public int[] getMove()
     {
         return null;
     }
