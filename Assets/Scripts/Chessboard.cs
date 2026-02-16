@@ -41,6 +41,7 @@ public class Chessboard : MonoBehaviour
 
     public void setState(string state)
     {
+        CleanBoard();
         string pos = state.Split(" ")[0];
         string[] rows = pos.Split("/");
         int x, y = 7;
@@ -62,9 +63,14 @@ public class Chessboard : MonoBehaviour
             y--;
         }
     }
-    public bool hasPiece(int cellID)
+    public void Move(int start, int target)
     {
-        return tiles[cellID].piece != null;
+        GameObject piece = tiles[start].piece;
+        tiles[start].piece = null;
+        Destroy(tiles[target].piece);
+        tiles[target].piece = piece;
+        Vector2Int targetCell = IDToCell(target);
+        piece.transform.position = CellToWorld(targetCell.x,targetCell.y);
     }
     public void PieceFollowMousePos(int cellID,Vector3 position)
     {
@@ -96,8 +102,16 @@ public class Chessboard : MonoBehaviour
         piece.transform.parent = pieces.transform;
 
     } 
-    private void cleanBoard()
+    private void CleanBoard()
     {
+        for (int i=0;i<tiles.Length;i++)
+        {
+            tiles[i].piece = null;
+        }
+        foreach (Transform child in pieces.transform)
+        {
+            Destroy(child.gameObject);
+        }
     }
     private void CreateBoard()
     {

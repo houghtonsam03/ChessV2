@@ -8,18 +8,16 @@ using UnityEngine.EventSystems;
 public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHandler , IDragHandler
 {
 
-    
+    // Game Objects
     private ChessEngine engine;
     private Chessboard board;
-    private bool isWhiteTurn;
-    // Selection logic
+    // Selection Logic
     private int selectedID;
 
     public void Setup(ChessEngine en,Chessboard bo)
     {
         engine = en;
         board = bo;
-        isWhiteTurn = true;
     }
     public void OnPointerDown(PointerEventData eventData)
     {
@@ -27,9 +25,10 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(eventData.position);
         Vector2Int cell = Chessboard.WorldToCell(mousePos);
 
+
         if (cell.x < 0 || cell.x > 7 || cell.y < 0 || cell.y > 7) return;
         selectedID = Chessboard.CellToID(cell.x,cell.y);
-        if (board.hasPiece(selectedID)) board.PieceFollowMousePos(selectedID,eventData.position); // Update to !engine.hasPiece(selectedID)
+        if (engine.hasPiece(selectedID,engine.IsWhiteTurn())) board.PieceFollowMousePos(selectedID,eventData.position); 
         else selectedID = -1;
     }
 
@@ -48,7 +47,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
             selectedID = -1;
             return;
         }
-        if (engine.isLegalMove(selectedID,Chessboard.CellToID(cell.x,cell.y)))
+        if (engine.IsLegalMove(selectedID,Chessboard.CellToID(cell.x,cell.y)))
         {
             engine.Move(selectedID,Chessboard.CellToID(cell.x,cell.y));
         }
@@ -63,6 +62,5 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         // Runs when pressed down cursor moves
         board.PieceFollowMousePos(selectedID,eventData.position);
     }
-
 
 }
