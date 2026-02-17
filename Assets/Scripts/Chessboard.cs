@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Data;
 using Unity.Collections;
 using Unity.VisualScripting;
@@ -5,12 +6,15 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Analytics;
 using UnityEngine.EventSystems;
+using static ChessEngine;
 
 public class Chessboard : MonoBehaviour
 {
     public Color color1;
     public Color color2;
-    public Color background;
+    public Color backgroundColor;
+    public Color highlightColor;
+    public Color moveColor;
     public GameObject tilePrefab;
     private Tile[] tiles;
     private GameObject TileGrid;
@@ -33,10 +37,13 @@ public class Chessboard : MonoBehaviour
         CreateBoard();
         this.transform.name = "Chessboard";
     }
-
+    public void Setup(ChessEngine en)
+    {
+        engine = en;
+    }
     void OnValidate()
     {
-        colorTiles();
+        ColorTiles();
     }
 
     public void setState(string state)
@@ -63,6 +70,24 @@ public class Chessboard : MonoBehaviour
             y--;
         }
     }
+    public void readBoard()
+    {
+        for (int i=0;i<64;i++)
+        {
+            int piece = Board.Square[i];
+            if (piece == 0) continue;
+            char s = ' ';
+            if (Piece.GetType(piece) == 1) s = 'k';
+            if (Piece.GetType(piece) == 2) s = 'p';
+            if (Piece.GetType(piece) == 3) s = 'n';
+            if (Piece.GetType(piece) == 4) s = 'b';
+            if (Piece.GetType(piece) == 5) s = 'r';
+            if (Piece.GetType(piece) == 6) s = 'q';
+            if (Piece.GetColour(piece) == 8) s = char.ToUpper(s);
+            Vector2Int cell = IDToCell(i);
+            spawnPiece(s,cell.x,cell.y);
+        }
+    }
     public void Move(int start, int target)
     {
         GameObject piece = tiles[start].piece;
@@ -84,6 +109,15 @@ public class Chessboard : MonoBehaviour
         Vector2Int cell = IDToCell(cellID);
         tiles[cellID].piece.transform.position = CellToWorld(cell.x,cell.y);
     }
+    public void PaintMoves(int cellID)
+    {
+        List<Move> moves = engine.GetLegalMoves(cellID);
+        tiles[cellID].cell.GetComponent<SpriteRenderer>().color = highlightColor;
+        foreach (Move move in moves)
+        {
+            tiles[move.TargetSquare].cell.GetComponent<SpriteRenderer>().color = moveColor;
+        }
+    }
     private void spawnPiece(char letter,int x,int y)
     {
         string prefab = "";
@@ -101,7 +135,7 @@ public class Chessboard : MonoBehaviour
         tiles[CellToID(x,y)].piece = piece;
         piece.transform.parent = pieces.transform;
 
-    } 
+    }
     private void CleanBoard()
     {
         for (int i=0;i<tiles.Length;i++)
@@ -131,9 +165,9 @@ public class Chessboard : MonoBehaviour
         t.y = i / 8;
         return t;
     }
-    private void colorTiles()
+    public void ColorTiles()
     {
-        this.transform.GetChild(2).GetComponent<SpriteRenderer>().color = background;
+        this.transform.GetChild(2).GetComponent<SpriteRenderer>().color = backgroundColor;
         if (tiles == null) return;
         for (int x=0;x<8;x++)
         {

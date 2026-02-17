@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Analytics;
 using UnityEngine.EventSystems;
+using static ChessEngine;
 
 public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHandler , IDragHandler
 {
@@ -28,7 +29,10 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
 
         if (cell.x < 0 || cell.x > 7 || cell.y < 0 || cell.y > 7) return;
         selectedID = Chessboard.CellToID(cell.x,cell.y);
-        if (engine.hasPiece(selectedID,engine.IsWhiteTurn())) board.PieceFollowMousePos(selectedID,eventData.position); 
+        if (engine.hasPiece(selectedID,Board.ColourToMove)) {
+            board.PieceFollowMousePos(selectedID,eventData.position); 
+            board.PaintMoves(selectedID);
+        }
         else selectedID = -1;
     }
 
@@ -41,15 +45,18 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(eventData.position);
         Vector2Int cell = Chessboard.WorldToCell(mousePos);
 
+        // Recolour the tiles
+        board.ColorTiles();
         // If move is oob or no move.
         if (cell.x < 0 || cell.x > 7 || cell.y < 0 || cell.y > 7 || Chessboard.CellToID(cell.x,cell.y) == selectedID)  {
             board.resetPiecePos(selectedID);
             selectedID = -1;
             return;
         }
-        if (engine.IsLegalMove(selectedID,Chessboard.CellToID(cell.x,cell.y)))
+        Move move = new Move(selectedID,Chessboard.CellToID(cell.x,cell.y));
+        if (engine.IsLegalMove(move))
         {
-            engine.Move(selectedID,Chessboard.CellToID(cell.x,cell.y));
+            engine.MakeMove(move);
         }
         else {
             board.resetPiecePos(selectedID);
@@ -60,7 +67,9 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     public void OnDrag(PointerEventData eventData)
     {
         // Runs when pressed down cursor moves
+        if (selectedID == -1) return;
         board.PieceFollowMousePos(selectedID,eventData.position);
+        board.PaintMoves(selectedID);
     }
 
 }

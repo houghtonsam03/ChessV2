@@ -1,4 +1,5 @@
 using UnityEngine;
+using static ChessEngine;
 
 public abstract class ChessAgent : MonoBehaviour
 {
@@ -15,8 +16,8 @@ public abstract class ChessAgent : MonoBehaviour
     {
         gameState = state;
     }
-    public int[] getMove()
+    public Move getMove()
     {
-        return null;
+        return new Move();
     }
 }
