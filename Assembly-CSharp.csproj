@@ -53,6 +53,7 @@
     <Compile Include="Assets\Scripts\ChessEngine.cs" />
     <Compile Include="Assets\Scripts\ChessAgent.cs" />
     <Compile Include="Assets\Scripts\Chessboard.cs" />
+    <Compile Include="Assets\Scripts\RandomAgent.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">

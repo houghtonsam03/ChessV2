@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Analytics;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using static ChessEngine;
 
 public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHandler , IDragHandler
@@ -15,15 +16,23 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     // Selection Logic
     private int selectedID;
     public bool gameOver;
-
-    public void Setup(ChessEngine en,Chessboard bo)
+    public bool[] isHuman;
+    public int turn;
+    public void Setup(ChessEngine en,Chessboard bo,bool[] human)
     {
         engine = en;
         board = bo;
+        isHuman = new bool[2];
+        isHuman[0] = human[0]; isHuman[1] = human[1];
+        turn = 0;
+    }
+    public void Update()
+    {
+        if (Keyboard.current.spaceKey.wasPressedThisFrame) DebugMethod();
     }
     public void OnPointerDown(PointerEventData eventData)
     {
-        if (gameOver) {
+        if (gameOver || !isHuman[turn]) {
             selectedID = -1;
             return;
         }
@@ -75,6 +84,11 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         if (selectedID == -1) return;
         board.PieceFollowMousePos(selectedID,eventData.position);
         board.PaintMoves(selectedID);
+    }
+    public void DebugMethod()
+    {
+        Debug.Log("Debug");
+        engine.DebugUndo();
     }
 
 }

@@ -1,23 +1,9 @@
 using UnityEngine;
 using static ChessEngine;
 
-public abstract class ChessAgent : MonoBehaviour
+public abstract class ChessAgent : ScriptableObject
 {
-    // Game Information
-    private bool isWhite;
-    private string gameState;
+    public abstract void StartAgent(bool white);
 
-    public void StartAgent(bool white)
-    {
-        isWhite = white;
-    }
-
-    public void setState(string state)
-    {
-        gameState = state;
-    }
-    public Move getMove()
-    {
-        return new Move();
-    }
+    public abstract Move GetMove(Board board);
 }
