@@ -14,6 +14,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     private Chessboard board;
     // Selection Logic
     private int selectedID;
+    public bool gameOver;
 
     public void Setup(ChessEngine en,Chessboard bo)
     {
@@ -22,6 +23,10 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     }
     public void OnPointerDown(PointerEventData eventData)
     {
+        if (gameOver) {
+            selectedID = -1;
+            return;
+        }
         // This runs whenever mouse1 is pressed
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(eventData.position);
         Vector2Int cell = Chessboard.WorldToCell(mousePos);
@@ -29,7 +34,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
 
         if (cell.x < 0 || cell.x > 7 || cell.y < 0 || cell.y > 7) return;
         selectedID = Chessboard.CellToID(cell.x,cell.y);
-        if (engine.hasPiece(selectedID,Board.ColourToMove)) {
+        if (engine.hasPiece(selectedID,true)) {
             board.PieceFollowMousePos(selectedID,eventData.position); 
             board.PaintMoves(selectedID);
         }

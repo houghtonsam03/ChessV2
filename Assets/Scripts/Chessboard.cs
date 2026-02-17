@@ -20,7 +20,6 @@ public class Chessboard : MonoBehaviour
     private GameObject TileGrid;
     private GameObject pieces;
     private ChessEngine engine;
-    // Selection logic
 
     private struct Tile
     {
@@ -70,11 +69,11 @@ public class Chessboard : MonoBehaviour
             y--;
         }
     }
-    public void readBoard()
+    public void readBoard(Board b)
     {
         for (int i=0;i<64;i++)
         {
-            int piece = Board.Square[i];
+            int piece = b.Square[i];
             if (piece == 0) continue;
             char s = ' ';
             if (Piece.GetType(piece) == 1) s = 'k';
@@ -117,6 +116,10 @@ public class Chessboard : MonoBehaviour
         {
             tiles[move.TargetSquare].cell.GetComponent<SpriteRenderer>().color = moveColor;
         }
+    }
+    public void DrawGameOver(int kingPos)
+    {
+        tiles[kingPos].cell.GetComponent<SpriteRenderer>().color = Color.green;
     }
     private void spawnPiece(char letter,int x,int y)
     {
