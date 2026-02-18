@@ -382,11 +382,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   graphics: 1
-  timeDelay: 0.1
+  timeDelay: 1
   PlayerOneSide: 2
-  humanPlayer1: 0
   agent1: {fileID: 0}
-  humanPlayer2: 0
   agent2: {fileID: 0}
 --- !u!4 &1942845421
 Transform:

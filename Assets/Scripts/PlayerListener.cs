@@ -40,7 +40,6 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(eventData.position);
         Vector2Int cell = Chessboard.WorldToCell(mousePos);
 
-
         if (cell.x < 0 || cell.x > 7 || cell.y < 0 || cell.y > 7) return;
         selectedID = Chessboard.CellToID(cell.x,cell.y);
         if (engine.hasPiece(selectedID,true)) {
@@ -58,18 +57,26 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
 
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(eventData.position);
         Vector2Int cell = Chessboard.WorldToCell(mousePos);
+        int hoverID = Chessboard.CellToID(cell.x,cell.y);
 
         // Recolour the tiles
         board.ColorTiles();
+
         // If move is oob or no move.
-        if (cell.x < 0 || cell.x > 7 || cell.y < 0 || cell.y > 7 || Chessboard.CellToID(cell.x,cell.y) == selectedID)  {
+        if (cell.x < 0 || cell.x > 7 || cell.y < 0 || cell.y > 7 || hoverID == selectedID)  {
             board.resetPiecePos(selectedID);
             selectedID = -1;
             return;
         }
-        Move move = new Move(selectedID,Chessboard.CellToID(cell.x,cell.y));
-        if (engine.IsLegalMove(move))
+        int promotionPiece = 0;
+        if (IsPromotionMove(hoverID))
         {
+            // Make player decide
+            promotionPiece = Piece.Queen;
+        }
+        if (engine.HasLegalMove(selectedID,hoverID,promotionPiece))
+        {
+            Move move = engine.GetMove(selectedID,hoverID,promotionPiece);
             engine.MakeMove(move);
         }
         else {
@@ -84,6 +91,11 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         if (selectedID == -1) return;
         board.PieceFollowMousePos(selectedID,eventData.position);
         board.PaintMoves(selectedID);
+    }
+    public bool IsPromotionMove(int targetID)
+    {
+        bool lastRank = ChessEngine.GetRank(targetID) == (turn^1)*7;
+        return engine.hasPiece(selectedID,true,Piece.Pawn) && lastRank;
     }
     public void DebugMethod()
     {

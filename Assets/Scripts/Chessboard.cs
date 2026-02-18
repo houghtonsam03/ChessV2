@@ -71,6 +71,7 @@ public class Chessboard : MonoBehaviour
     }
     public void readBoard(Board b)
     {
+        CleanBoard();
         for (int i=0;i<64;i++)
         {
             int piece = b.Square[i];

@@ -5,7 +5,9 @@ using System.Transactions;
 using NUnit.Framework;
 using NUnit.Framework.Constraints;
 using NUnit.Framework.Internal;
+using Unity.Collections;
 using Unity.VisualScripting;
+using UnityEditor.EngineDiagnostics;
 using UnityEngine;
 
 public class ChessEngine : MonoBehaviour
@@ -72,7 +74,7 @@ public class ChessEngine : MonoBehaviour
                 foreach (int[] move in knightMoveCells)
                 {
                     if (move[0] < 0 || move[0] > 7 || move[1] < 0 || move[1] > 7) continue;
-                    knightMoves[cellID].Add(new Move(cellID,move[1]*8+move[0]));
+                    knightMoves[cellID].Add(new Move(Piece.Knight,cellID,move[1]*8+move[0]));
                 }
             }
         }
@@ -122,7 +124,7 @@ public class ChessEngine : MonoBehaviour
         if (!board.gameOver)
         {   
             // Check for GameOver
-            if (moves.Count == 0)
+            if (moves.Count == 0) // Change the logic to use Board.IsGameOver()
             {
                 Debug.Log("GAMEOVER");
                 board.gameOver = true;
@@ -149,38 +151,33 @@ public class ChessEngine : MonoBehaviour
                 MakeMove(move);
             }
         }
-
-        // Debugging for undo move
-        // timer += Time.deltaTime;
-        // if (timer < timeDelay) return;
-        // board.UndoMove();
-        // // Update engine
-        // if (graphics || agents[0] == null || agents[1] == null) boardObject.setState(gameState);
-        // UpdateState();
-        // moves = GenerateMoves(board);
-        // playerListener.turn ^= 1;
-    }
-    public bool hasPiece(int cell)
-    {
-        return board.Square[cell] != 0;
     }
     public bool hasPiece(int cell,bool moveColour)
     {
         // Chess Logic
-        return (board.Square[cell] & board.colourToMove) != 0;
+        if (moveColour) return Piece.IsColour(board.Square[cell],board.colourToMove);
+        else return !Piece.IsType(board.Square[cell],Piece.None);
+    }
+    public bool hasPiece(int cell,bool moveColour,int pieceType)
+    {
+        // Chess Logic
+        if (moveColour) return Piece.IsColour(board.Square[cell],board.colourToMove) && Piece.IsType(board.Square[cell],pieceType);
+        else return Piece.IsType(board.Square[cell],pieceType);
     }
     public void MakeMove(Move move)
     {
-        if (IsLegalMove(move))
+        if (HasLegalMove(move))
         {
-            // Chess Logic
+            // Update Engine
             board.MakeMove(move);
-
-            // Update engine
-            if (graphics || agents[0] == null || agents[1] == null) boardObject.Move(move.StartSquare,move.TargetSquare);
-            UpdateState();
             moves = GenerateMoves(board);
+            // Update dependencies
             playerListener.turn ^= 1;
+            if (graphics || agents[0] == null || agents[1] == null) boardObject.readBoard(board);
+
+            // Debugging
+            Debug.Log(board);
+            Debug.Log(move);
 
             // Time delay logic
             timer = 0;
@@ -194,10 +191,28 @@ public class ChessEngine : MonoBehaviour
             Debug.Log($"Illegal move by {s} player.");
         }
     }
-    public bool IsLegalMove(Move move)
+    public Move GetMove(int start, int target,int promotionPiece=0)
     {
-        // Chess Logic
+        // Returns the move from the moves list that is equal to mv
+        foreach (Move move in moves)
+        {
+            Move mv = new Move(board.Square[start],start,target,promotionPiece);
+            if (move == mv) return move;
+        }
+        return new Move();
+    }
+    public bool HasLegalMove(Move move)
+    {
         return moves.Contains(move);
+    }
+    public bool HasLegalMove(int start, int target,int promotionPiece=0)
+    {
+        foreach (Move move in moves)
+        {
+            Move mv = new Move(board.Square[start],start,target,promotionPiece);
+            if (move == mv) return true;
+        }
+        return false;
     }
     private void UpdateState()
     {
@@ -226,45 +241,56 @@ public class ChessEngine : MonoBehaviour
         // Debugging for undo move
         board.UndoMove();
         UpdateState();
-        if (graphics || agents[0] == null || agents[1] == null) boardObject.setState(gameState);
+        if (graphics || agents[0] == null || agents[1] == null) boardObject.readBoard(board);
         moves = GenerateMoves(board);
         playerListener.turn ^= 1;
     }
-    public static List<Move> GenerateMoves(Board b)
+    public static List<Move> GenerateMoves(Board board,int colour=Piece.white+Piece.black, int type=0)
     {
-        List<Move> mv = GeneratePseudoLegalMoves(b);
-        SolvePseudoMoves(b,mv);
-        return mv;
-    }
-    private static List<Move> GeneratePseudoLegalMoves(Board b)
-    {
-        List<Move> mv = new List<Move>();
-        for (int start=0;start<64;start++)
+        List<Move> allMoves = new List<Move>();
+        for (int i=0;i<64;i++)
         {
-            int piece = b.Square[start];
-            if (Piece.IsColour(piece,b.colourToMove))
+            if (!Piece.IsColour(board.Square[i],colour)) continue;
+            if (type == 0) // Don't care about type
             {
-                if (Piece.IsSlidingPiece(piece))
-                {
-                    GenerateSlidingMoves(b,mv,start,piece);
-                }
-                else if (Piece.IsType(piece,Piece.King))
-                {
-                    GenerateKingMoves(b,mv,start,piece);
-                }
-                else if (Piece.IsType(piece,Piece.Pawn))
-                {
-                    GeneratePawnMoves(b,mv,start,piece);
-                }
-                else if (Piece.IsType(piece,Piece.Knight))
-                {
-                    GenerateKnightMoves(b,mv,start,piece);
-                }
+                List<Move> squareMoves = GenerateMove(board,i);
+                SolvePseudoMoves(board,squareMoves);
+                allMoves.AddRange(squareMoves);
             }
+            else
+            {
+                if (!Piece.IsType(board.Square[i],type)) continue;
+                List<Move> squareMoves = GenerateMove(board,i);
+                SolvePseudoMoves(board,squareMoves);
+                allMoves.AddRange(squareMoves);
+            }
+
+        }
+        return allMoves;
+    }
+    public static List<Move> GenerateMove(Board board,int start,bool includeCastling = true)
+    {
+        int piece = board.Square[start];
+        List<Move> mv = new List<Move>();
+        if (Piece.IsSlidingPiece(piece))
+        {
+            GenerateSlidingMoves(board,mv,start,piece);
+        }
+        else if (Piece.IsType(piece,Piece.King))
+        {
+            GenerateKingMoves(board,mv,start,piece,includeCastling);
+        }
+        else if (Piece.IsType(piece,Piece.Pawn))
+        {
+            GeneratePawnMoves(board,mv,start,piece);
+        }
+        else if (Piece.IsType(piece,Piece.Knight))
+        {
+            GenerateKnightMoves(board,mv,start,piece);
         }
         return mv;
     }
-    private static void GenerateSlidingMoves(Board b,List<Move> mv,int startCell, int piece)
+    public static void GenerateSlidingMoves(Board board,List<Move> mv,int startCell, int piece)
     {
         int startDirIndex = Piece.IsType(piece,Piece.Bishop) ? 4 : 0;
         int endDirIndex = Piece.IsType(piece,Piece.Rook) ? 4 : 8;
@@ -273,13 +299,13 @@ public class ChessEngine : MonoBehaviour
             for (int n=1;n <= NumSquaresToEdge[startCell][directionIndex];n++)
             {
                 int targetCell = startCell + directionOffsets[directionIndex] * n;
-                int pieceOnTarget = b.Square[targetCell];
+                int pieceOnTarget = board.Square[targetCell];
 
                 if (Piece.IsColour(pieceOnTarget,Piece.GetColour(piece))) // Same colour piece
                 {
                     break;
                 }
-                mv.Add(new Move(startCell,targetCell));
+                mv.Add(new Move(piece,startCell,targetCell));
                 
                 if (Piece.IsColour(pieceOnTarget,Piece.GetOpponentColour(piece)))
                 {
@@ -288,89 +314,116 @@ public class ChessEngine : MonoBehaviour
             }
         }
     }
-    private static void GenerateKingMoves(Board b,List<Move> mv,int startCell, int piece)
+    public static void GenerateKingMoves(Board board,List<Move> mv,int startCell, int piece,bool includeCastling)
     {
         for (int i=0;i<8;i++)
         {   
             if (NumSquaresToEdge[startCell][i] == 0) continue;
             int targetCell = startCell + directionOffsets[i];
-            int targetPiece = b.Square[targetCell];
+            int targetPiece = board.Square[targetCell];
             if (Piece.IsColour(targetPiece,Piece.GetColour(piece))) continue;
-            mv.Add(new Move(startCell,targetCell));
+            mv.Add(new Move(piece,startCell,targetCell));
+        }
+        if (!includeCastling) return;
+        // Castling
+        // If castling is allowed and squares between are and not under attack clear we can castle.
+        int teamOffset = Piece.IsColour(piece, Piece.white) ? 0 : 2;
+        int rankOffset = Piece.IsColour(piece, Piece.white) ? 0 : 56;
+        // Kingside
+        if (board.castling[0+teamOffset])
+        {
+            if (!board.IsAttacked(rankOffset+5,Piece.GetOpponentColour(piece)) && Piece.IsType(board.Square[rankOffset+5],Piece.None) &&
+                !board.IsAttacked(rankOffset+6,Piece.GetOpponentColour(piece)) && Piece.IsType(board.Square[rankOffset+6],Piece.None))
+            {
+                mv.Add(new Move(piece,startCell,rankOffset+6,Piece.None,true,false));
+            }
+        }
+        // Queenside
+        if (board.castling[1+teamOffset])
+        {
+            if (Piece.IsType(board.Square[rankOffset+1],Piece.None) &&
+                !board.IsAttacked(rankOffset+2,Piece.GetOpponentColour(piece)) && Piece.IsType(board.Square[rankOffset+2],Piece.None) &&
+                !board.IsAttacked(rankOffset+3,Piece.GetOpponentColour(piece)) && Piece.IsType(board.Square[rankOffset+3],Piece.None))
+            {
+                mv.Add(new Move(piece,startCell,rankOffset+2,Piece.None,true,false));
+            }
         }
     }
-    private static void GeneratePawnMoves(Board b,List<Move> mv,int startCell, int piece)
+    public static void GeneratePawnMoves(Board board,List<Move> mv,int startCell, int piece)
     {
-        // En Passant logic here
-        
-
-        // In case pawn can't move further (pre-promotion code)
-        if ((GetRank(startCell) == 8 && Piece.IsColour(piece,Piece.white)) || (GetRank(startCell) == 1 && Piece.IsColour(piece,Piece.black))) return;
-
         // Check diagonal capture and En Passant
         int team = (Piece.GetColour(piece)/8)-1;
+        int lastRank = Piece.GetColour(piece) == Piece.white ? 7 : 0;
 
         int[] captureDirIndex = new int[]{4+team,6+team}; // Index for diagonal movements.
         foreach (int dirIndex in captureDirIndex)
         {
             if (NumSquaresToEdge[startCell][dirIndex] == 0) continue;
             int captureCell = startCell + directionOffsets[dirIndex];
-            int capturePiece = b.Square[captureCell];
-            if ((!Piece.IsColour(capturePiece,Piece.GetColour(piece)) && capturePiece != 0) || b.enpassant == captureCell) mv.Add(new Move(startCell,captureCell));
+            int capturePiece = board.Square[captureCell];
+            if (Piece.IsColour(capturePiece,Piece.GetOpponentColour(piece)) && capturePiece != Piece.None)
+            {
+                if (GetRank(captureCell) == lastRank)
+                {
+                    mv.Add(new Move(piece,startCell,captureCell,Piece.Queen));
+                    mv.Add(new Move(piece,startCell,captureCell,Piece.Rook));
+                    mv.Add(new Move(piece,startCell,captureCell,Piece.Knight));
+                    mv.Add(new Move(piece,startCell,captureCell,Piece.Bishop));
+                }
+                else mv.Add(new Move(piece,startCell,captureCell));
+            }
+            if (board.enpassant == captureCell) mv.Add(new Move(piece,startCell,captureCell,Piece.None,false,true));
         }
 
         // Check pawn move 1 step.
         int targetCell = startCell + directionOffsets[team];
-        int targetPiece = b.Square[targetCell];
+        int targetPiece = board.Square[targetCell];
         if (targetPiece != 0) return;
-        mv.Add(new Move(startCell,targetCell));
+        if (GetRank(targetCell) == lastRank)
+        {
+            mv.Add(new Move(piece,startCell,targetCell,Piece.Queen));
+            mv.Add(new Move(piece,startCell,targetCell,Piece.Rook));
+            mv.Add(new Move(piece,startCell,targetCell,Piece.Knight));
+            mv.Add(new Move(Piece.Pawn,startCell,targetCell,Piece.Bishop));
+        } 
+        else mv.Add(new Move(piece,startCell,targetCell));
 
         // Check pawn move 2 step.
-        if ((GetRank(startCell) == 2 && Piece.IsColour(piece,Piece.white)) || (GetRank(startCell) == 7 && Piece.IsColour(piece,Piece.black)))
+        if ((GetRank(startCell) == 1 && Piece.IsColour(piece,Piece.white)) || (GetRank(startCell) == 6 && Piece.IsColour(piece,Piece.black)))
         {
             targetCell = startCell + directionOffsets[team] * 2;
-            targetPiece = b.Square[targetCell];
-            if (targetPiece == 0) mv.Add(new Move(startCell,targetCell));
+            targetPiece = board.Square[targetCell];
+            if (targetPiece == 0) mv.Add(new Move(piece,startCell,targetCell));
         } 
     }
-    private static void GenerateKnightMoves(Board b,List<Move> mv,int startCell, int piece)
+    public static void GenerateKnightMoves(Board board,List<Move> mv,int startCell, int piece)
     {
         foreach (Move move in knightMoves[startCell])
         {
-            int targetPiece = b.Square[move.TargetSquare];
+            int targetPiece = board.Square[move.TargetSquare];
             if (Piece.IsColour(targetPiece,Piece.GetColour(piece))) continue;
             mv.Add(move);
         }
     }
-    private static void SolvePseudoMoves(Board b,List<Move> mvs)
+    public static void SolvePseudoMoves(Board board,List<Move> mvs)
     {
         for(int i = mvs.Count-1;i >= 0;i--)
         {
             Move move = mvs[i];
-            bool canCaptureKing = false;
-            int kingColour = b.colourToMove;
+            int kingColour = board.colourToMove;
 
-            b.MakeMove(move);
-            List<Move> newMoves = GeneratePseudoLegalMoves(b);
-            int kingPos = b.FindKing(kingColour);
-
-            foreach (Move newMove in newMoves)
-            {
-                if (newMove.TargetSquare != kingPos) continue;
-                canCaptureKing = true;
-                break;
-            }
-            if (canCaptureKing) mvs.Remove(move);
-            b.UndoMove();
+            board.MakeMove(move);
+            if (board.IsCheck(kingColour)) mvs.Remove(move);
+            board.UndoMove();
         }
     }
     public static int GetRank(int startSquare)
     {
-        return (startSquare/8)+1;
+        return (startSquare/8);
     }
     public static int GetFile(int startSquare)
     {
-        return (startSquare%8)+1;
+        return (startSquare%8);
     }
     public static string CellToString(int cellID)
     {
@@ -412,6 +465,10 @@ public class ChessEngine : MonoBehaviour
         {
             return GetType(piece) == type;
         }
+        public static bool IsTypeAndColour(int piece,int type,int colour)
+        {
+            return IsType(piece,type) && IsColour(piece,colour);
+        }
         public static int GetOpponentColour(int piece)
         {
             return GetColour(piece ^ 0b_11000);
@@ -427,7 +484,8 @@ public class ChessEngine : MonoBehaviour
         public int fullmove = 1;
         public  bool gameOver = false;
         // Logic variables
-        public List<LastMove> lastMoves;
+        private List<LastMove> lastMoves;
+        private ChessEngine engine;
         public struct LastMove
         {
             public Move Move;
@@ -498,15 +556,84 @@ public class ChessEngine : MonoBehaviour
         }
         public void MakeMove(Move move)
         {
+            // Board assumes move is possible and legal.
+
             // Record Move
-            LastMove lm = new LastMove(move,Square[move.TargetSquare],castling,enpassant,halfmove,fullmove);
+            int capturedPiece = Square[move.TargetSquare];
+            if (move.enpassant) {
+                int captureSquare = GetRank(move.StartSquare)*8 + GetFile(move.TargetSquare);
+                capturedPiece = Square[captureSquare];
+            }
+            LastMove lm = new LastMove(move,capturedPiece,castling,enpassant,halfmove,fullmove);
             lastMoves.Add(lm);
 
-            // Make Move
+            // Record movement
+            enpassant = -1;
+            if (!Piece.IsType(Square[move.StartSquare],Piece.Pawn) && Piece.IsType(lm.CapturedPiece,Piece.None)) halfmove += 1;
+            if (Piece.IsColour(colourToMove,Piece.black)) fullmove += 1;
+
             int movingPiece = Square[move.StartSquare];
-            Square[move.StartSquare] = 0;
-            Square[move.TargetSquare] = movingPiece;
-            colourToMove ^= 0b_11000;
+
+            // Make Move
+            if (move.castling)
+            {
+                // Move pieces
+                Square[move.TargetSquare] = Square[move.StartSquare];
+                Square[move.StartSquare] = Piece.None;
+                int rank = GetRank(move.StartSquare);
+                int startFile = GetFile(move.TargetSquare) == 2 ? 0 : 7;
+                int targetFile = GetFile(move.TargetSquare) == 2 ? 3 : 5;
+                int rookStart = rank*8+startFile;
+                int rookTarget = rank*8+targetFile;
+                Square[rookTarget] = Square[rookStart];
+                Square[rookStart] = Piece.None;
+                // Update legal castling moves
+                if (rank == 0) {castling[0] = false; castling[1] = false;}
+                else {castling[2] = false; castling[3] = false;}
+            }
+            else if (move.enpassant)
+            {
+                // Move friendly pawn
+                Square[move.TargetSquare] = Square[move.StartSquare];
+                Square[move.StartSquare] = Piece.None;
+                // Remove enemy pawn
+                int rank = GetRank(move.StartSquare);
+                int file = GetFile(move.TargetSquare);
+                int capturedSquare = rank*8+file;
+                Square[capturedSquare] = Piece.None;
+            }
+            else if (move.promotionPiece != 0)
+            {
+                Square[move.TargetSquare] = move.promotionPiece+Piece.GetColour(move.movingPiece);
+                Square[move.StartSquare] = Piece.None;
+                if (move.TargetSquare == 7) castling[0] = false;
+                else if (move.TargetSquare == 0) castling[1] = false;
+                else if (move.TargetSquare == 63) castling[2] = false;
+                else if (move.TargetSquare == 56) castling[3] = false;
+            }
+            else
+            {
+                // Move pieces
+                Square[move.TargetSquare] = Square[move.StartSquare];
+                Square[move.StartSquare] = Piece.None;
+                // Update legal castling moves
+                if (Piece.IsType(movingPiece,Piece.King))
+                {
+                    if (Piece.GetColour(movingPiece) == Piece.white) {castling[0] = false; castling[1] = false;}
+                    else {castling[2] = false; castling[3] = false;}
+                }
+                foreach (int sq in new int[]{move.StartSquare,move.TargetSquare})
+                {
+                    if (sq == 7) castling[0] = false;
+                    else if (sq == 0) castling[1] = false;
+                    else if (sq == 63) castling[2] = false;
+                    else if (sq == 56) castling[3] = false;
+                }
+                // Update En Passant possible location
+                if (Piece.IsType(movingPiece,Piece.Pawn) && (Math.Abs(move.TargetSquare-move.StartSquare) == 16)) enpassant = move.StartSquare + 8 * Math.Sign(move.TargetSquare-move.StartSquare);
+            }
+            colourToMove = Piece.GetOpponentColour(colourToMove);
+            gameOver = IsGameOver() == 0;
         }
         public void UndoMove()
         {
@@ -521,20 +648,20 @@ public class ChessEngine : MonoBehaviour
                 Square[lastMove.Move.StartSquare] = Square[lastMove.Move.TargetSquare];
                 Square[lastMove.Move.TargetSquare] = Piece.None;
                 // Revert Rook
-                int rookStartFile = (lastMove.Move.TargetSquare-lastMove.Move.StartSquare) > 0 ? 7 : 0;
-                int rookTargetFile = (lastMove.Move.TargetSquare-lastMove.Move.StartSquare) > 0 ? 5 : 3;
-                int rookRank = GetRank(lastMove.Move.StartSquare);
-                int rookStartSquare = rookRank*8+rookStartFile;
-                int rookTargetSquare = rookRank*8+rookTargetFile;
-                Square[rookStartSquare] = Square[rookTargetSquare];
-                Square[rookTargetSquare] = Piece.None;
+                int startFile = (lastMove.Move.TargetSquare-lastMove.Move.StartSquare) > 0 ? 7 : 0;
+                int targetFile = (lastMove.Move.TargetSquare-lastMove.Move.StartSquare) > 0 ? 5 : 3;
+                int rank = GetRank(lastMove.Move.StartSquare);
+                int rookStart = rank*8+startFile;
+                int rookTarget = rank*8+targetFile;
+                Square[rookStart] = Square[rookTarget];
+                Square[rookTarget] = Piece.None;
 
                 
             }
             else if (lastMove.Move.enpassant)
             {
-                int yDir = Math.Sign(lastMove.Move.TargetSquare - lastMove.Move.StartSquare);
-                int capturedSquare = lastMove.Move.TargetSquare - directionOffsets[0] * yDir;
+
+                int capturedSquare = GetRank(lastMove.Move.StartSquare) * 8 + GetFile(lastMove.Move.TargetSquare);
 
                 // Revert move
                 Square[lastMove.Move.StartSquare] = Square[lastMove.Move.TargetSquare];
@@ -558,7 +685,7 @@ public class ChessEngine : MonoBehaviour
             enpassant = lastMove.EnPassant;
             halfmove = lastMove.HalfMove;
             fullmove = lastMove.FullMove;
-            colourToMove ^= 0b_11000;
+            colourToMove = Piece.GetOpponentColour(colourToMove);
             gameOver = false;
 
         }
@@ -570,6 +697,76 @@ public class ChessEngine : MonoBehaviour
                 if (Square[i] == mask) return i;
             }
             return -1; // No King Found
+        }
+        public int IsGameOver()
+        {
+            // 0 - Not Gameover , 1 - Player1 Win , 2 - Player2 Win , 3 - Draw
+            return 0;
+        }
+        public List<int> GetPiecePositions(int colour=24,int type=0)
+        {
+            List<int> positions = new List<int>();
+            for (int pos=0;pos<64;pos++)
+            {
+                if (Piece.IsColour(Square[pos],colour))
+                {
+                    if (type == 0 && !Piece.IsType(Square[pos],Piece.None)) positions.Add(pos);
+                    else if (type != 0 && Piece.IsType(Square[pos],type)) positions.Add(pos);
+                } 
+            }
+            return positions;
+        }
+        public List<Move> GetAttackingMoves(int defending,int colour=24,int type=0)
+        {
+            // Pseudolegal attacks
+            List<Move> attacks = new List<Move>();
+            List<int> enemyPositions = GetPiecePositions(colour);
+            foreach (int pos in enemyPositions) 
+            {
+                List<Move> moves = ChessEngine.GenerateMove(this,pos,includeCastling: false);
+                foreach (Move move in moves)
+                {   
+                    if (type == 0 && move.TargetSquare == defending) attacks.Add(move);
+                    else if (type != 0 && move.TargetSquare == defending && Piece.IsType(move.movingPiece,type)) attacks.Add(move);
+                }
+            }
+            return attacks;
+        }
+        public bool IsCheck(int colour)
+        {
+            int kingSquare = FindKing(colour);
+            return IsAttacked(kingSquare,Piece.GetOpponentColour(colour));
+        }
+        public bool IsAttacked(int defending,int colour=24,int type=0)
+        {
+            return GetAttackingMoves(defending,colour,type).Count != 0;
+        }
+        public override string ToString()
+        {
+            string output = "\n"; 
+
+            for (int y = 7; y >= 0; y--) // Start from the top rank (8) down to 1
+            {
+                for (int x = 0; x < 8; x++)
+                {
+                    int cell = y * 8 + x;
+                    int piece = Square[cell];
+                    int type = Piece.GetType(piece);
+
+                    char s;
+                    if (type == Piece.King) s = 'k';
+                    else if (type == Piece.Pawn) s = 'p';
+                    else if (type == Piece.Knight) s = 'n';
+                    else if (type == Piece.Bishop) s = 'b';
+                    else if (type == Piece.Rook) s = 'r';
+                    else if (type == Piece.Queen) s = 'q';
+                    else s = ' ';
+                    char finalChar = Piece.GetColour(piece) == Piece.black ? s : char.ToUpper(s);
+                    output += "|" + finalChar.ToString().PadLeft(2).PadRight(2);
+                }
+                output += "|\n";
+            }
+            return output;
         }
         public static string BoardToFen(Board b)
         {
@@ -621,13 +818,15 @@ public class ChessEngine : MonoBehaviour
     }
     public struct Move
     {
+        public readonly int movingPiece;
         public readonly int StartSquare;
         public readonly int TargetSquare;
         public readonly int promotionPiece;
         public readonly bool castling;
         public readonly bool enpassant;
-        public Move(int start,int target,int promotion=0,bool cast=false,bool enpass=false)
+        public Move(int piece,int start,int target,int promotion=0,bool cast=false,bool enpass=false)
         {
+            movingPiece = piece;
             StartSquare = start;
             TargetSquare = target;
             promotionPiece = promotion;
@@ -636,11 +835,13 @@ public class ChessEngine : MonoBehaviour
         }
         public static bool operator ==(Move mv1,Move mv2)
         {
-            return (mv1.StartSquare == mv2.StartSquare) && (mv1.TargetSquare == mv2.TargetSquare);
+            return  (mv1.StartSquare == mv2.StartSquare) &&
+                    (mv1.TargetSquare == mv2.TargetSquare) &&
+                    (mv1.promotionPiece == mv2.promotionPiece);
         }
         public static bool operator !=(Move mv1,Move mv2)
         {
-            return (mv1.StartSquare != mv2.StartSquare) || (mv1.TargetSquare != mv2.TargetSquare);
+            return !(mv1 == mv2);
         }
         public override bool Equals(object obj)
         {
@@ -649,6 +850,14 @@ public class ChessEngine : MonoBehaviour
         public override int GetHashCode()
         {
             return (StartSquare << 6) ^ TargetSquare;
+        }
+        public override string ToString()
+        {
+            string s = ChessEngine.CellToString(StartSquare) + ChessEngine.CellToString(TargetSquare);
+            
+            s += $":  {promotionPiece}, {castling}, {enpassant}";
+
+            return s;
         }
     }
 }
