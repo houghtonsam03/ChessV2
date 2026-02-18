@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Data;
 using Unity.VisualScripting;
 using UnityEditor;
@@ -12,13 +13,13 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
 
     // Game Objects
     private ChessEngine engine;
-    private Chessboard board;
+    private BoardUI board;
     // Selection Logic
     private int selectedID;
     public bool gameOver;
     public bool[] isHuman;
     public int turn;
-    public void Setup(ChessEngine en,Chessboard bo,bool[] human)
+    public void Setup(ChessEngine en,BoardUI bo,bool[] human)
     {
         engine = en;
         board = bo;
@@ -38,13 +39,14 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         }
         // This runs whenever mouse1 is pressed
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(eventData.position);
-        Vector2Int cell = Chessboard.WorldToCell(mousePos);
+        Vector2Int cell = BoardUI.WorldToCell(mousePos);
 
         if (cell.x < 0 || cell.x > 7 || cell.y < 0 || cell.y > 7) return;
-        selectedID = Chessboard.CellToID(cell.x,cell.y);
+        selectedID = BoardUI.CellToID(cell.x,cell.y);
         if (engine.hasPiece(selectedID,true)) {
-            board.PieceFollowMousePos(selectedID,eventData.position); 
-            board.PaintMoves(selectedID);
+            board.PieceFollowMousePos(selectedID,eventData.position);
+            List<Move> moves = engine.GetLegalMoves(selectedID);
+            board.PaintMoves(selectedID,moves);
         }
         else selectedID = -1;
     }
@@ -53,11 +55,11 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     {
         // This runs whenever mouse1 is released
 
-        if (selectedID < 0) return; // If not seleceted a piece
+        if (selectedID < 0 || gameOver) return; // If not seleceted a piece
 
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(eventData.position);
-        Vector2Int cell = Chessboard.WorldToCell(mousePos);
-        int hoverID = Chessboard.CellToID(cell.x,cell.y);
+        Vector2Int cell = BoardUI.WorldToCell(mousePos);
+        int hoverID = BoardUI.CellToID(cell.x,cell.y);
 
         // Recolour the tiles
         board.ColorTiles();
@@ -89,8 +91,11 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     {
         // Runs when pressed down cursor moves
         if (selectedID == -1) return;
-        board.PieceFollowMousePos(selectedID,eventData.position);
-        board.PaintMoves(selectedID);
+        if (gameOver) {
+            board.resetPiecePos(selectedID);
+            selectedID = -1;
+        }
+        else board.PieceFollowMousePos(selectedID,eventData.position);
     }
     public bool IsPromotionMove(int targetID)
     {
@@ -100,7 +105,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     public void DebugMethod()
     {
         Debug.Log("Debug");
-        engine.DebugUndo();
+        engine.UndoMoves();
     }
 
 }

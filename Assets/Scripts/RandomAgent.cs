@@ -8,16 +8,21 @@ using Random = System.Random;
 public class RandomAgent : ChessAgent
 {
     // Game Information
-    private string gameState;
+    private int colour;
     
-    public override void StartAgent(bool white)
+    public override void StartAgent(int col)
     {
+        colour = col;
     }
     public override Move GetMove(Board board)
     {
-        List<Move> moves = GenerateMoves(board);
+        List<Move> moves = GenerateMoves(board,colour);
 
         Random rand = new Random();
         return moves[rand.Next(moves.Count)];
+    }
+    public override string GetColour()
+    {
+        return Piece.IsColour(colour,Piece.white) ? "White" : "Black";
     }
 }

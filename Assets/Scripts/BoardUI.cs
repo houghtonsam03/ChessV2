@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using Unity.Collections;
 using Unity.VisualScripting;
 using UnityEditor;
@@ -8,7 +9,7 @@ using UnityEngine.Analytics;
 using UnityEngine.EventSystems;
 using static ChessEngine;
 
-public class Chessboard : MonoBehaviour
+public class BoardUI : MonoBehaviour
 {
     public Color color1;
     public Color color2;
@@ -109,18 +110,39 @@ public class Chessboard : MonoBehaviour
         Vector2Int cell = IDToCell(cellID);
         tiles[cellID].piece.transform.position = CellToWorld(cell.x,cell.y);
     }
-    public void PaintMoves(int cellID)
+    public void PaintMoves(int startID,List<Move> moves)
     {
-        List<Move> moves = engine.GetLegalMoves(cellID);
-        tiles[cellID].cell.GetComponent<SpriteRenderer>().color = highlightColor;
+        tiles[startID].cell.GetComponent<SpriteRenderer>().color = highlightColor;
         foreach (Move move in moves)
         {
             tiles[move.TargetSquare].cell.GetComponent<SpriteRenderer>().color = moveColor;
         }
     }
-    public void DrawGameOver(int kingPos)
+    public void DrawGameOver(int state,int whitePos,int blackPos)
     {
-        tiles[kingPos].cell.GetComponent<SpriteRenderer>().color = Color.green;
+        ColorTiles();
+        Color c1;
+        Color c2;
+        if (new int[]{1,2,3}.Contains(state)) {c1=Color.green; c2=Color.red;}
+        else if (new int[]{4,5,6}.Contains(state)) {c1=Color.red; c2=Color.green;}
+        else if (new int[]{7,8,9,10,11,12}.Contains(state)) {c1=Color.yellow; c2=Color.yellow;}
+        else return;
+        tiles[whitePos].cell.GetComponent<SpriteRenderer>().color = c1;
+        tiles[blackPos].cell.GetComponent<SpriteRenderer>().color = c2;
+        string endstate = "";
+        if (state == 1) endstate += "Black Checkmated";
+        if (state == 2) endstate += "Black Resigned";
+        if (state == 3) endstate += "Black Timeout";
+        if (state == 4) endstate += "White Checkmated";
+        if (state == 5) endstate += "White Resigned";
+        if (state == 6) endstate += "White Timeout";
+        if (state == 7) endstate += "Stalemate";
+        if (state == 8) endstate += "Insufficient Material";
+        if (state == 9) endstate += "Fify-Move-Rule";
+        if (state == 10) endstate += "Threefold Repetition";
+        if (state == 11) endstate += "Draw Vote";
+        if (state == 12) endstate += "Timeout";
+        Debug.Log(endstate);
     }
     private void spawnPiece(char letter,int x,int y)
     {
