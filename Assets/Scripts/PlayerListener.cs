@@ -2,10 +2,12 @@ using System.Collections.Generic;
 using System.Data;
 using Unity.VisualScripting;
 using UnityEditor;
+using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.Analytics;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 using static ChessEngine;
 
 public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHandler , IDragHandler
@@ -15,10 +17,11 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     private ChessEngine engine;
     private BoardUI board;
     // Selection Logic
-    private int selectedID;
-    public bool gameOver;
-    public bool[] isHuman;
+    private int selectedID = -1;
+    private bool[] isHuman;
+    private int promotionCell = -1;
     public int turn;
+    public bool gameOver;
     public void Setup(ChessEngine en,BoardUI bo,bool[] human)
     {
         engine = en;
@@ -29,7 +32,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     }
     public void Update()
     {
-        if (Keyboard.current.spaceKey.wasPressedThisFrame) DebugMethod();
+        if (Keyboard.current.spaceKey.wasPressedThisFrame) ResetGame();
     }
     public void OnPointerDown(PointerEventData eventData)
     {
@@ -40,51 +43,64 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         // This runs whenever mouse1 is pressed
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(eventData.position);
         Vector2Int cell = BoardUI.WorldToCell(mousePos);
-
-        if (cell.x < 0 || cell.x > 7 || cell.y < 0 || cell.y > 7) return;
-        selectedID = BoardUI.CellToID(cell.x,cell.y);
-        if (engine.hasPiece(selectedID,true)) {
-            board.PieceFollowMousePos(selectedID,eventData.position);
-            List<Move> moves = engine.GetLegalMoves(selectedID);
-            board.PaintMoves(selectedID,moves);
+        int cellID = BoardUI.CellToID(cell);
+        if (IsOOB(mousePos) && selectedID >= 0) board.ResetPiecePos(selectedID);
+        else if (promotionCell >= 0)
+        {
+            int promotionPiece = GetPromotionPiece(mousePos);
+            if (engine.IsLegalMove(selectedID,promotionCell,promotionPiece))
+            {
+                Move move = engine.GetMove(selectedID,promotionCell,promotionPiece);
+                engine.MakeMove(move);
+                board.RemovePromotionTile();
+                UnSelect();
+            }
+            else UnSelect();
         }
-        else selectedID = -1;
+        else if (cellID == selectedID) UnSelect();
+        else if (selectedID == -1 && promotionCell == -1) Select(cellID,eventData.position);
+        else if (IsPromotionMove(cellID) && engine.HasLegalMove(selectedID,cellID))
+        {
+            SpawnPromotionUI(cellID);
+            promotionCell = cellID;
+            return;
+        }
+        // Move to square
+        else if (engine.HasLegalMove(selectedID,cellID))
+        {
+            Move move = engine.GetMove(selectedID,cellID);
+            engine.MakeMove(move);
+            UnSelect();
+        }
     }
 
     public void OnPointerUp(PointerEventData eventData)
     {
         // This runs whenever mouse1 is released
 
-        if (selectedID < 0 || gameOver) return; // If not seleceted a piece
+        if (selectedID < 0 || gameOver || promotionCell != -1) return;  // If: No piece selected , Gameover , Promotion pending.
 
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(eventData.position);
         Vector2Int cell = BoardUI.WorldToCell(mousePos);
-        int hoverID = BoardUI.CellToID(cell.x,cell.y);
+        int cellID = BoardUI.CellToID(cell);
 
-        // Recolour the tiles
-        board.ColorTiles();
-
-        // If move is oob or no move.
-        if (cell.x < 0 || cell.x > 7 || cell.y < 0 || cell.y > 7 || hoverID == selectedID)  {
-            board.resetPiecePos(selectedID);
-            selectedID = -1;
+        // If move is oob or no legal move -> reset the piece.
+        if (IsOOB(mousePos)) board.ResetPiecePos(selectedID);
+        else if (cellID == selectedID || !engine.HasLegalMove(selectedID,cellID)) board.ResetPiecePos(selectedID);
+        // Pick Promotion
+        else if (IsPromotionMove(cellID) && engine.HasLegalMove(selectedID,cellID))
+        {
+            SpawnPromotionUI(cellID);
+            promotionCell = cellID;
             return;
         }
-        int promotionPiece = 0;
-        if (IsPromotionMove(hoverID))
+        // Move to square
+        else if (engine.HasLegalMove(selectedID,cellID))
         {
-            // Make player decide
-            promotionPiece = Piece.Queen;
-        }
-        if (engine.HasLegalMove(selectedID,hoverID,promotionPiece))
-        {
-            Move move = engine.GetMove(selectedID,hoverID,promotionPiece);
+            Move move = engine.GetMove(selectedID,cellID);
             engine.MakeMove(move);
+            UnSelect();
         }
-        else {
-            board.resetPiecePos(selectedID);
-        }
-        selectedID = -1;
         
     }
     public void OnDrag(PointerEventData eventData)
@@ -92,20 +108,63 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         // Runs when pressed down cursor moves
         if (selectedID == -1) return;
         if (gameOver) {
-            board.resetPiecePos(selectedID);
-            selectedID = -1;
+            board.ResetPiecePos(selectedID);
+            board.RemovePromotionTile();
+            UnSelect();
         }
         else board.PieceFollowMousePos(selectedID,eventData.position);
+    }
+    public void Select(int ID,Vector3 pos)
+    {
+        if (!engine.hasPiece(ID,true)) return;
+        selectedID = ID;
+        List<Move> moves = engine.GetLegalMoves(ID);
+        board.PaintMoves(ID,moves);
+        board.PieceFollowMousePos(selectedID,pos);
+    }
+    public void UnSelect()
+    {
+        board.ResetPiecePos();
+        board.RemovePromotionTile();
+        selectedID = -1;
+        promotionCell = -1;
+        board.ColorTiles();
+    }
+    public void SpawnPromotionUI(int ID)
+    {
+        int colour = (BoardUI.IDToCell(ID).y == 7) ? Piece.white : Piece.black;
+        promotionCell = ID;
+        board.ResetPiecePos(selectedID);
+        board.SpawnPromotionTile(ID,colour);
+
+    }
+    public int GetPromotionPiece(Vector3 mousePos)
+    {
+        if (-1 <= mousePos.x && mousePos.x <= 0 && 0 <= mousePos.y && mousePos.y <= 1) return Piece.Queen;
+        if (0 <= mousePos.x && mousePos.x <= 1 && 0 <= mousePos.y && mousePos.y <= 1) return Piece.Rook;
+        if (-1 <= mousePos.x && mousePos.x <= 0 && -1 <= mousePos.y && mousePos.y <= 0) return Piece.Knight;
+        if (0 <= mousePos.x && mousePos.x <= 1 && -1 <= mousePos.y && mousePos.y <= 0) return Piece.Bishop;
+        return 0;
     }
     public bool IsPromotionMove(int targetID)
     {
         bool lastRank = ChessEngine.GetRank(targetID) == (turn^1)*7;
         return engine.hasPiece(selectedID,true,Piece.Pawn) && lastRank;
     }
+    public bool IsOOB(Vector3 pos)
+    {
+        Vector2Int cell = BoardUI.WorldToCell(pos);
+        if (0 > cell.x || cell.x > 7 || 0 > cell.y || cell.y > 7) return true;
+        return false;
+    }
     public void DebugMethod()
     {
         Debug.Log("Debug");
         engine.UndoMoves();
+    }
+    public void ResetGame()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
 }

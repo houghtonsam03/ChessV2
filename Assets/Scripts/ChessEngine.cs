@@ -12,11 +12,11 @@ using Unity.Mathematics;
 using Unity.VisualScripting;
 using UnityEditor.EngineDiagnostics;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class ChessEngine : MonoBehaviour
 {
     public bool Graphics;
-    public float MoveDelay = 0.1f;
     public ChessAgent Agent1;
     public ChessAgent Agent2;
     public enum Player1Side {White,Black,Random};
@@ -31,7 +31,6 @@ public class ChessEngine : MonoBehaviour
     private PlayerListener playerListener;
 
     // Timer variables;
-    private float moveDelayTimer;
     private float playerTimer;
     private float whiteTimer;
     private float blackTimer;
@@ -145,28 +144,18 @@ public class ChessEngine : MonoBehaviour
             playerListener.Setup(this,boardUI,human);
         }
     }
+    public void Reset()
+    {
+    }
 
     void Update()
     {
         if (!board.gameOver)
         {   
-            // Check for GameOver
-            int state = board.IsGameOver(whiteTimer,blackTimer);
-            if (state != 0) // Change the logic to use Board.IsGameOver()
-            {
-                board.gameOver = true;
-                playerListener.gameOver = true;
-                if (Graphics || agents[0] == null || agents[1] == null) boardUI.DrawGameOver(state,board.FindKing(player1Colour),board.FindKing(Piece.GetOpponentColour(player1Colour)));
-            }
-
-            // Time Delay
-            moveDelayTimer += Time.deltaTime;
-            if (moveDelayTimer < MoveDelay) return;
-
             if (Piece.IsColour(board.colourToMove,Piece.white)) whiteTimer -= Time.realtimeSinceStartup - playerTimer;
             else blackTimer -= Time.realtimeSinceStartup - playerTimer;
             playerTimer = Time.realtimeSinceStartup;
-            Debug.Log($"WhiteTime: {whiteTimer} | BlackTime: {blackTimer}");
+            // Debug.Log($"WhiteTime: {whiteTimer} | BlackTime: {blackTimer}");
             
             // Find the index of the player whose turn it is.
             int turnIndex = Piece.IsColour(player1Colour,board.colourToMove) ? 0 : 1;
@@ -182,6 +171,16 @@ public class ChessEngine : MonoBehaviour
                 // Main AI Loop
                 Move move = agent.GetMove(board);
                 MakeMove(move);
+            }
+
+            // Check for GameOver
+            int state = board.IsGameOver(whiteTimer,blackTimer);
+            if (state != 0)
+            {
+                board.gameOver = true;
+                playerListener.gameOver = true;
+                if (Graphics || agents[0] == null || agents[1] == null) boardUI.DrawGameOver(state,board.FindKing(player1Colour),board.FindKing(Piece.GetOpponentColour(player1Colour)));
+                return;
             }
         }
     }
@@ -199,7 +198,7 @@ public class ChessEngine : MonoBehaviour
     }
     public void MakeMove(Move move)
     {
-        if (HasLegalMove(move))
+        if (IsLegalMove(move))
         {
             // Update Engine
             board.MakeMove(move);
@@ -213,8 +212,6 @@ public class ChessEngine : MonoBehaviour
             // Debug.Log(board);
             // Debug.Log(move);
 
-            // Delay timer
-            moveDelayTimer = 0;
         }
         // Debug Logic
         else
@@ -235,16 +232,20 @@ public class ChessEngine : MonoBehaviour
         }
         return null;
     }
-    public bool HasLegalMove(Move move)
+    public bool IsLegalMove(Move move)
     {
         return moves.Contains(move);
     }
-    public bool HasLegalMove(int start, int target,int promotionPiece=0)
+    public bool IsLegalMove(int start, int target, int promotionPiece)
+    {
+        return moves.Contains(new Move(board.Square[start],start,target,promotionPiece));
+    }
+    public bool HasLegalMove(int start, int target)
     {
         foreach (Move move in moves)
         {
-            Move mv = new Move(board.Square[start],start,target,promotionPiece);
-            if (move == mv) return true;
+            Move mv = new Move(board.Square[start],start,target);
+            if (move.StartSquare == mv.StartSquare && move.TargetSquare == mv.TargetSquare) return true;
         }
         return false;
     }

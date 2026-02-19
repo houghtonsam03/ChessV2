@@ -20,6 +20,7 @@ public class BoardUI : MonoBehaviour
     private Tile[] tiles;
     private GameObject TileGrid;
     private GameObject pieces;
+    private GameObject promotionTile;
     private ChessEngine engine;
 
     private struct Tile
@@ -63,7 +64,7 @@ public class BoardUI : MonoBehaviour
                 }
                 else
                 {
-                    spawnPiece(letter,x,y);
+                    spawnPiece(letter,new Vector2Int(x,y));
                     x++;
                 }
             }
@@ -86,7 +87,7 @@ public class BoardUI : MonoBehaviour
             if (Piece.GetType(piece) == 6) s = 'q';
             if (Piece.GetColour(piece) == 8) s = char.ToUpper(s);
             Vector2Int cell = IDToCell(i);
-            spawnPiece(s,cell.x,cell.y);
+            spawnPiece(s,cell);
         }
     }
     public void Move(int start, int target)
@@ -96,7 +97,7 @@ public class BoardUI : MonoBehaviour
         Destroy(tiles[target].piece);
         tiles[target].piece = piece;
         Vector2Int targetCell = IDToCell(target);
-        piece.transform.position = CellToWorld(targetCell.x,targetCell.y);
+        piece.transform.position = CellToWorld(targetCell);
     }
     public void PieceFollowMousePos(int cellID,Vector3 position)
     {
@@ -105,18 +106,36 @@ public class BoardUI : MonoBehaviour
         mouseWorldPos.z = -1;
         tiles[cellID].piece.transform.position = mouseWorldPos;
     }
-    public void resetPiecePos(int cellID)
+    public void ResetPiecePos(int cellID = -1)
     {
+        if (cellID == -1)
+        {
+            for (int x=0;x<8;x++)
+            {
+                for (int y=0;y<8;y++)
+                {
+                    Tile tile = tiles[CellToID(new Vector2Int(x,y))];
+                    if (tile.piece == null) continue;
+                    tile.piece.transform.position = CellToWorld(new Vector2Int(x,y));
+                }
+            }
+            
+            return;
+        }
         Vector2Int cell = IDToCell(cellID);
-        tiles[cellID].piece.transform.position = CellToWorld(cell.x,cell.y);
+        tiles[cellID].piece.transform.position = CellToWorld(cell);
     }
     public void PaintMoves(int startID,List<Move> moves)
     {
-        tiles[startID].cell.GetComponent<SpriteRenderer>().color = highlightColor;
+        Select(startID);
         foreach (Move move in moves)
         {
             tiles[move.TargetSquare].cell.GetComponent<SpriteRenderer>().color = moveColor;
         }
+    }
+    public void Select(int selectID)
+    {
+        tiles[selectID].cell.GetComponent<SpriteRenderer>().color = highlightColor;
     }
     public void DrawGameOver(int state,int whitePos,int blackPos)
     {
@@ -144,7 +163,7 @@ public class BoardUI : MonoBehaviour
         if (state == 12) endstate += "Timeout";
         Debug.Log(endstate);
     }
-    private void spawnPiece(char letter,int x,int y)
+    private void spawnPiece(char letter,Vector2Int cell)
     {
         string prefab = "";
         if (char.IsUpper(letter)) prefab += "White ";
@@ -156,9 +175,9 @@ public class BoardUI : MonoBehaviour
         if (char.ToLower(letter) == 'q') prefab += "Queen";
         if (char.ToLower(letter) == 'k') prefab += "King";
         GameObject piecePrefab = Resources.Load<GameObject>(prefab);
-        GameObject piece = Instantiate(piecePrefab,CellToWorld(x,y),Quaternion.identity);
+        GameObject piece = Instantiate(piecePrefab,CellToWorld(cell),Quaternion.identity);
         piece.name = prefab;
-        tiles[CellToID(x,y)].piece = piece;
+        tiles[CellToID(cell)].piece = piece;
         piece.transform.parent = pieces.transform;
 
     }
@@ -200,22 +219,59 @@ public class BoardUI : MonoBehaviour
             for (int y=0;y<8;y++)
             {
                 Color col = (x + y) % 2 == 0 ? color1 : color2;
-                tiles[CellToID(x,y)].cell.GetComponent<SpriteRenderer>().color = col;
+                tiles[CellToID(new Vector2Int(x,y))].cell.GetComponent<SpriteRenderer>().color = col;
             }
         }
     }
-    public static Vector3 CellToWorld(int x, int y)
+    public void SpawnPromotionTile(int cellID,int colour)
+    {
+        GameObject prefab = Resources.Load<GameObject>("PromotionTile");
+        promotionTile = Instantiate(prefab,Vector3.zero,Quaternion.identity);
+        promotionTile.name = "Promotiontile";
+        promotionTile.transform.position += new Vector3(0,0,-2);
+        promotionTile.transform.parent = this.transform;
+        for (int i=0;i<promotionTile.transform.childCount;i++)
+        {
+            promotionTile.transform.GetChild(i).GetComponent<SpriteRenderer>().color = Color.white;
+        }
+        string col = Piece.IsColour(colour,Piece.white) ? "White " : "Black ";
+        string[] names = new string[]{"Knight","Bishop","Queen","Rook"};
+        for (int i=0;i<4;i++)
+        {
+            string name = col + names[i];
+            GameObject piecePrefab = Resources.Load<GameObject>(name);
+            int x = i%2;
+            int y = i/2;
+            GameObject piece = Instantiate(piecePrefab,Vector3.zero,Quaternion.identity);
+            piece.name = names[i];
+            piece.transform.parent = promotionTile.transform;
+            piece.transform.localScale = Vector3.one;
+            piece.transform.position = promotionTile.transform.position + new Vector3(x-0.5f,y-0.5f,0) + Vector3.back;
+        }
+    }
+    public void RemovePromotionTile()
+    {
+        if (promotionTile != null) {
+            Destroy(promotionTile);
+            promotionTile = null;
+        }
+    }
+    public static Vector3 CellToWorld(Vector2Int cell)
     {
         // x,y in (0-7)
-        return new Vector3(x-3.5f,y-3.5f,0);
+        return new Vector3(cell.x-3.5f,cell.y-3.5f,0);
     }
-    public static int CellToID(int x, int y)
+    public static int CellToID(Vector2Int cell)
     {
-        return 8*y+x;
+        return 8*cell.y+cell.x;
     }
     public static Vector2Int IDToCell(int cellID)
     {
         return new Vector2Int(cellID%8,cellID/8);
+    }
+    public static Vector3 IDToWorld(int cellID)
+    {
+        return CellToWorld(IDToCell(cellID));
     }
     public static Vector2Int WorldToCell(Vector3 worldPos)
     {
