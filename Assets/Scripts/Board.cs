@@ -73,6 +73,31 @@ public class Board
                 cell += 1;
             }
         }
+        colourToMove = fenFields[1] == "w" ? Piece.white : Piece.black;
+        string cast = fenFields[2];
+        castling = new bool[]{false,false,false,false};
+        foreach (char s in cast)
+        {
+            switch (s)
+            {
+                case 'K': 
+                    castling[0] = true;
+                    break;
+                case 'Q':
+                    castling[1] = true;
+                    break;
+                case 'k':
+                    castling[2] = true;
+                    break;
+                case 'q':
+                    castling[3] = true;
+                    break;
+                
+            }
+        }
+        if (fenFields[3] != "-") enpassant = StringToID(fenFields[3]);
+        halfmove = fenFields[4].ToCharArray()[0] -'0';
+        halfmove = fenFields[5].ToCharArray()[0] -'0';
         zobristKey = ZobristHash(this);
         positionHistory.Add(zobristKey);
     }
@@ -514,7 +539,7 @@ public class Board
         cast += b.castling[3] ? "q" : "";
         fen += (cast.Length != 0) ? cast + " " : "- ";
         // En Passant
-        fen += (b.enpassant != -1) ? CellToString(b.enpassant) + " " : "- ";
+        fen += (b.enpassant != -1) ? IDToString(b.enpassant) + " " : "- ";
         // Halfmove
         fen += b.halfmove.ToString() + " ";
         // Fullmove

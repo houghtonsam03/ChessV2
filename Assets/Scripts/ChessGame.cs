@@ -452,12 +452,20 @@ public class ChessGame : MonoBehaviour
     {
         return (startSquare%8);
     }
-    public static string CellToString(int cellID)
+    public static string IDToString(int cellID)
     {
         char[] col = new char[]{'a','b','c','d','e','f','g','h'};
         char[] row = new char[]{'1','2','3','4','5','6','7','8'};
         int x = cellID%8 , y = cellID/8;
         return ""+col[x]+row[y];
+    }
+    public static int StringToID(string square)
+    {
+        List<char> files = new List<char>();
+        files.AddRange(new char[]{'a','b','c','d','e','f','g','h'});
+        int y = files.IndexOf(square.ToCharArray()[0]) - 1;
+        int x = square.ToCharArray()[1]-'0';
+        return BoardUI.CellToID(new Vector2Int(x,y));
     }
     public static void PrintState(int state)
     {
