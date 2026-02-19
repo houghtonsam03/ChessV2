@@ -1,15 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Data;
 using System.Linq;
 using Unity.Collections;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.Analytics;
-using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
-using static ChessGame;
 
 public class BoardUI : MonoBehaviour
 {
@@ -144,9 +140,9 @@ public class BoardUI : MonoBehaviour
         ColorTiles();
         Color c1;
         Color c2;
-        if (new int[]{1,2,3}.Contains(state)) {c1=Color.green; c2=Color.red;}
-        else if (new int[]{4,5,6}.Contains(state)) {c1=Color.red; c2=Color.green;}
-        else if (new int[]{7,8,9,10,11,12}.Contains(state)) {c1=Color.yellow; c2=Color.yellow;}
+        if (1 <= state && state <= 3) {c1=Color.green; c2=Color.red;}
+        else if (4 <= state && state <= 6) {c1=Color.red; c2=Color.green;}
+        else if (7 <= state && state <= 12) {c1=Color.yellow; c2=Color.yellow;}
         else return;
         tiles[whitePos].cell.GetComponent<SpriteRenderer>().color = c1;
         tiles[blackPos].cell.GetComponent<SpriteRenderer>().color = c2;

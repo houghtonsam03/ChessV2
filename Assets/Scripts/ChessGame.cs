@@ -1,18 +1,7 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
-using System.Transactions;
-using NUnit.Framework;
-using NUnit.Framework.Constraints;
-using NUnit.Framework.Internal;
-using Unity.Collections;
-using Unity.Mathematics;
 using Unity.VisualScripting;
-using UnityEditor.EngineDiagnostics;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 public class ChessGame : MonoBehaviour
 {
@@ -38,6 +27,7 @@ public class ChessGame : MonoBehaviour
     private string gameState;
     private List<Move> moves;
     private Board board;
+    private int endState;
 
     // Movement variables
     public static readonly int[] directionOffsets = {8,-8,-1,1,7,-9,9,-7};
@@ -147,7 +137,6 @@ public class ChessGame : MonoBehaviour
     public void Reset()
     {
     }
-
     void Update()
     {
         if (board == null) return;
@@ -183,8 +172,7 @@ public class ChessGame : MonoBehaviour
                     boardUI.DrawGameOver(state,board.FindKing(player1Colour),board.FindKing(Piece.GetOpponentColour(player1Colour)));
                     playerListener.gameOver = true;
                 }
-                PrintState(state);
-                print(board);
+                endState = state;
                 return;
             }
         }
@@ -268,6 +256,10 @@ public class ChessGame : MonoBehaviour
         }
         return legalMoves;
     } 
+    public int GetEndState()
+    {
+        return endState;
+    }
     public void UndoMoves()
     {
         // Debugging for undoing two moves

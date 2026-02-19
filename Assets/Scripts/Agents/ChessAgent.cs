@@ -1,5 +1,4 @@
 using UnityEngine;
-using static ChessGame;
 
 public abstract class ChessAgent : ScriptableObject
 {

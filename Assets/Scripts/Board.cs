@@ -1,8 +1,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Net;
-using NUnit.Framework;
 using UnityEngine;
 using static ChessGame;
 
