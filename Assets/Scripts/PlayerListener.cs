@@ -4,17 +4,16 @@ using Unity.VisualScripting;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
-using UnityEngine.Analytics;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
-using static ChessEngine;
+using static ChessGame;
 
 public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHandler , IDragHandler
 {
 
     // Game Objects
-    private ChessEngine engine;
+    private ChessGame game;
     private BoardUI board;
     // Selection Logic
     private int selectedID = -1;
@@ -22,9 +21,9 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     private int promotionCell = -1;
     public int turn;
     public bool gameOver;
-    public void Setup(ChessEngine en,BoardUI bo,bool[] human)
+    public void Setup(ChessGame en,BoardUI bo,bool[] human)
     {
-        engine = en;
+        game = en;
         board = bo;
         isHuman = new bool[2];
         isHuman[0] = human[0]; isHuman[1] = human[1];
@@ -48,10 +47,10 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         else if (promotionCell >= 0)
         {
             int promotionPiece = GetPromotionPiece(mousePos);
-            if (engine.IsLegalMove(selectedID,promotionCell,promotionPiece))
+            if (game.IsLegalMove(selectedID,promotionCell,promotionPiece))
             {
-                Move move = engine.GetMove(selectedID,promotionCell,promotionPiece);
-                engine.MakeMove(move);
+                Move move = game.GetMove(selectedID,promotionCell,promotionPiece);
+                game.MakeMove(move);
                 board.RemovePromotionTile();
                 UnSelect();
             }
@@ -59,17 +58,17 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         }
         else if (cellID == selectedID) UnSelect();
         else if (selectedID == -1 && promotionCell == -1) Select(cellID,eventData.position);
-        else if (IsPromotionMove(cellID) && engine.HasLegalMove(selectedID,cellID))
+        else if (IsPromotionMove(cellID) && game.HasLegalMove(selectedID,cellID))
         {
             SpawnPromotionUI(cellID);
             promotionCell = cellID;
             return;
         }
         // Move to square
-        else if (engine.HasLegalMove(selectedID,cellID))
+        else if (game.HasLegalMove(selectedID,cellID))
         {
-            Move move = engine.GetMove(selectedID,cellID);
-            engine.MakeMove(move);
+            Move move = game.GetMove(selectedID,cellID);
+            game.MakeMove(move);
             UnSelect();
         }
     }
@@ -86,19 +85,19 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
 
         // If move is oob or no legal move -> reset the piece.
         if (IsOOB(mousePos)) board.ResetPiecePos(selectedID);
-        else if (cellID == selectedID || !engine.HasLegalMove(selectedID,cellID)) board.ResetPiecePos(selectedID);
+        else if (cellID == selectedID || !game.HasLegalMove(selectedID,cellID)) board.ResetPiecePos(selectedID);
         // Pick Promotion
-        else if (IsPromotionMove(cellID) && engine.HasLegalMove(selectedID,cellID))
+        else if (IsPromotionMove(cellID) && game.HasLegalMove(selectedID,cellID))
         {
             SpawnPromotionUI(cellID);
             promotionCell = cellID;
             return;
         }
         // Move to square
-        else if (engine.HasLegalMove(selectedID,cellID))
+        else if (game.HasLegalMove(selectedID,cellID))
         {
-            Move move = engine.GetMove(selectedID,cellID);
-            engine.MakeMove(move);
+            Move move = game.GetMove(selectedID,cellID);
+            game.MakeMove(move);
             UnSelect();
         }
         
@@ -116,9 +115,9 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     }
     public void Select(int ID,Vector3 pos)
     {
-        if (!engine.hasPiece(ID,true)) return;
+        if (!game.hasPiece(ID,true)) return;
         selectedID = ID;
-        List<Move> moves = engine.GetLegalMoves(ID);
+        List<Move> moves = game.GetLegalMoves(ID);
         board.PaintMoves(ID,moves);
         board.PieceFollowMousePos(selectedID,pos);
     }
@@ -148,8 +147,8 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     }
     public bool IsPromotionMove(int targetID)
     {
-        bool lastRank = ChessEngine.GetRank(targetID) == (turn^1)*7;
-        return engine.hasPiece(selectedID,true,Piece.Pawn) && lastRank;
+        bool lastRank = ChessGame.GetRank(targetID) == (turn^1)*7;
+        return game.hasPiece(selectedID,true,Piece.Pawn) && lastRank;
     }
     public bool IsOOB(Vector3 pos)
     {
@@ -160,7 +159,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     public void DebugMethod()
     {
         Debug.Log("Debug");
-        engine.UndoMoves();
+        game.UndoMoves();
     }
     public void ResetGame()
     {

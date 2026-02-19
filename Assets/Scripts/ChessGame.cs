@@ -14,7 +14,7 @@ using UnityEditor.EngineDiagnostics;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-public class ChessEngine : MonoBehaviour
+public class ChessGame : MonoBehaviour
 {
     public bool Graphics;
     public ChessAgent Agent1;
@@ -102,7 +102,7 @@ public class ChessEngine : MonoBehaviour
         return System.BitConverter.ToUInt64(buffer, 0);
     }
     
-    static ChessEngine()
+    static ChessGame()
     {
         PrecomputeMoveData();
         PrecomputeZobristData();
@@ -135,8 +135,8 @@ public class ChessEngine : MonoBehaviour
         {
             GameObject prefab = Resources.Load<GameObject>("ChessboardPrefab");
             GameObject boardObject = Instantiate(prefab,Vector3.zero,Quaternion.identity);
+            boardObject.transform.parent = this.transform;
             boardUI = boardObject.GetComponent<BoardUI>();
-            boardUI.Setup(this);
             boardUI.readBoard(board);
             playerListener = boardUI.AddComponent<PlayerListener>();
             int turnIndex = Piece.IsColour(player1Colour,board.colourToMove) ? 0 : 1;
@@ -150,6 +150,7 @@ public class ChessEngine : MonoBehaviour
 
     void Update()
     {
+        if (board == null) return;
         if (!board.gameOver)
         {   
             if (Piece.IsColour(board.colourToMove,Piece.white)) whiteTimer -= Time.realtimeSinceStartup - playerTimer;
@@ -178,8 +179,12 @@ public class ChessEngine : MonoBehaviour
             if (state != 0)
             {
                 board.gameOver = true;
-                playerListener.gameOver = true;
-                if (Graphics || agents[0] == null || agents[1] == null) boardUI.DrawGameOver(state,board.FindKing(player1Colour),board.FindKing(Piece.GetOpponentColour(player1Colour)));
+                if (Graphics || agents[0] == null || agents[1] == null) {
+                    boardUI.DrawGameOver(state,board.FindKing(player1Colour),board.FindKing(Piece.GetOpponentColour(player1Colour)));
+                    playerListener.gameOver = true;
+                }
+                PrintState(state);
+                print(board);
                 return;
             }
         }
@@ -204,10 +209,11 @@ public class ChessEngine : MonoBehaviour
             board.MakeMove(move);
             moves = GenerateMoves(board,board.colourToMove);
             // Update dependencies
-            playerListener.turn ^= 1;
             UpdateState();
-            if (Graphics || agents[0] == null || agents[1] == null) boardUI.setState(gameState);
-
+            if (Graphics || agents[0] == null || agents[1] == null) {
+                boardUI.setState(gameState);
+                playerListener.turn ^= 1;
+            }
             // Debugging
             // Debug.Log(board);
             // Debug.Log(move);
@@ -460,5 +466,22 @@ public class ChessEngine : MonoBehaviour
         char[] row = new char[]{'1','2','3','4','5','6','7','8'};
         int x = cellID%8 , y = cellID/8;
         return ""+col[x]+row[y];
+    }
+    public static void PrintState(int state)
+    {
+        string endstate = "Not Gameover";
+        if (state == 1) endstate = "White Win | Checkmate";
+        if (state == 2) endstate = "White Win | Resign";
+        if (state == 3) endstate = "White Win | Timeout";
+        if (state == 4) endstate = "Black Win | Checkmate";
+        if (state == 5) endstate = "Black Win | Resign";
+        if (state == 6) endstate = "Black Win | Timeout";
+        if (state == 7) endstate = "Draw | Stalemate";
+        if (state == 8) endstate = "Draw | Insufficient Material";
+        if (state == 9) endstate = "Draw | Fify-Move-Rule";
+        if (state == 10) endstate = "Draw | Threefold Repetition";
+        if (state == 11) endstate = "Draw | Agreement";
+        if (state == 12) endstate = "Draw | Timeout";
+        Debug.Log(endstate);
     }
 }

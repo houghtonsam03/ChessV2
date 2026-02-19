@@ -1,9 +1,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.Net;
 using NUnit.Framework;
 using UnityEngine;
-using static ChessEngine;
+using static ChessGame;
 
 public class Board
 {
@@ -16,7 +17,6 @@ public class Board
     public  bool gameOver = false;
     // Logic variables
     private List<LastMove> lastMoves;
-    private ChessEngine engine;
     public struct LastMove
     {
         public Move Move;
@@ -164,7 +164,7 @@ public class Board
         }
         else if (move.promotionPiece != 0)
         {
-            Square[move.TargetSquare] = move.promotionPiece+Piece.GetColour(move.movingPiece);
+            Square[move.TargetSquare] = move.promotionPiece | colourToMove;
             Square[move.StartSquare] = Piece.None;
             if (move.TargetSquare == 7 && castling[0]) {castling[0] = false; zobristKey ^= ZobristKeys[12*64+1+0];}
             else if (move.TargetSquare == 0 && castling[1]) {castling[1] = false; zobristKey ^= ZobristKeys[12*64+1+1];}
@@ -252,7 +252,7 @@ public class Board
         else if (lastMove.Move.promotionPiece != 0)
         {
             // Remove promoted and recreate pawn
-            Square[lastMove.Move.StartSquare] = Piece.Pawn+Piece.GetColour(Square[lastMove.Move.TargetSquare]);
+            Square[lastMove.Move.StartSquare] = Piece.Pawn | Piece.GetOpponentColour(colourToMove);
             Square[lastMove.Move.TargetSquare] = lastMove.CapturedPiece;
         }
         else
@@ -287,12 +287,13 @@ public class Board
     {
         List<int> pieces = new List<int>();
         for (int pos=0;pos<64;pos++)
-        {
+        {   
             if (Piece.IsColour(Square[pos],colour))
             {
-                if (type == 0 && !Piece.IsType(Square[pos],Piece.None)) pieces.Add(Square[pos]);
+                if (type == 0) pieces.Add(Square[pos]);
                 else if (type != 0 && Piece.IsType(Square[pos],type)) pieces.Add(Square[pos]);
-            } 
+            }
+            // Debug.Log($"ID: {pos} | Piece: {Square[pos]} | pieces length : {pieces.Count}");
         }
         return pieces;
     }
@@ -316,7 +317,7 @@ public class Board
         List<int> enemyPositions = GetPiecePositions(colour);
         foreach (int pos in enemyPositions) 
         {
-            List<Move> moves = ChessEngine.GenerateMove(this,pos,includeCastling: false);
+            List<Move> moves = ChessGame.GenerateMove(this,pos,includeCastling: false);
             foreach (Move move in moves)
             {   
                 if (type == 0 && move.TargetSquare == defending) attacks.Add(move);
@@ -442,29 +443,37 @@ public class Board
     }
     public override string ToString()
     {
-        string output = "\n"; 
+        string output = "\n";
+        string horizontalLine = new string('-', 24) + "\n"; // Creates "---------------------------------"
 
-        for (int y = 7; y >= 0; y--) // Start from the top rank (8) down to 1
+        for (int y = 7; y >= 0; y--) 
         {
+            output += horizontalLine; // Add a line between rows for better visibility
             for (int x = 0; x < 8; x++)
             {
                 int cell = y * 8 + x;
                 int piece = Square[cell];
                 int type = Piece.GetType(piece);
 
-                char s;
-                if (type == Piece.King) s = 'k';
-                else if (type == Piece.Pawn) s = 'p';
-                else if (type == Piece.Knight) s = 'n';
-                else if (type == Piece.Bishop) s = 'b';
-                else if (type == Piece.Rook) s = 'r';
-                else if (type == Piece.Queen) s = 'q';
-                else s = ' ';
+                // Get the character (using a simpler switch for readability)
+                char s = type switch {
+                    Piece.King => 'k',
+                    Piece.Pawn => 'p',
+                    Piece.Knight => 'n',
+                    Piece.Bishop => 'b',
+                    Piece.Rook => 'r',
+                    Piece.Queen => 'q',
+                    _ => ' ' // Empty square
+                };
+
                 char finalChar = Piece.GetColour(piece) == Piece.black ? s : char.ToUpper(s);
-                output += "|" + finalChar.ToString().PadLeft(2).PadRight(2);
+
+                // {0,-4} means: take the first argument, and pad it to 4 characters, left-aligned.
+                output += string.Format("| {0} ", piece);
             }
-            output += "|\n";
+            output += "|\n"; // Close the row
         }
+        output += horizontalLine; // Final bottom border
         return output;
     }
     public static string BoardToFen(Board b)

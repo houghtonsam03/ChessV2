@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
-using static ChessEngine;
+using static ChessGame;
 using Random = System.Random;
 
 

@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -7,7 +8,8 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Analytics;
 using UnityEngine.EventSystems;
-using static ChessEngine;
+using UnityEngine.SceneManagement;
+using static ChessGame;
 
 public class BoardUI : MonoBehaviour
 {
@@ -21,7 +23,6 @@ public class BoardUI : MonoBehaviour
     private GameObject TileGrid;
     private GameObject pieces;
     private GameObject promotionTile;
-    private ChessEngine engine;
 
     private struct Tile
     {
@@ -38,15 +39,16 @@ public class BoardUI : MonoBehaviour
         CreateBoard();
         this.transform.name = "Chessboard";
     }
-    public void Setup(ChessEngine en)
-    {
-        engine = en;
-    }
     void OnValidate()
     {
         ColorTiles();
     }
 
+    IEnumerator WaitAndResetScene()
+    {
+        yield return new WaitForSeconds(0.2f);
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
     public void setState(string state)
     {
         CleanBoard();
@@ -119,7 +121,7 @@ public class BoardUI : MonoBehaviour
                     tile.piece.transform.position = CellToWorld(new Vector2Int(x,y));
                 }
             }
-            
+
             return;
         }
         Vector2Int cell = IDToCell(cellID);
@@ -148,20 +150,6 @@ public class BoardUI : MonoBehaviour
         else return;
         tiles[whitePos].cell.GetComponent<SpriteRenderer>().color = c1;
         tiles[blackPos].cell.GetComponent<SpriteRenderer>().color = c2;
-        string endstate = "";
-        if (state == 1) endstate += "Black Checkmated";
-        if (state == 2) endstate += "Black Resigned";
-        if (state == 3) endstate += "Black Timeout";
-        if (state == 4) endstate += "White Checkmated";
-        if (state == 5) endstate += "White Resigned";
-        if (state == 6) endstate += "White Timeout";
-        if (state == 7) endstate += "Stalemate";
-        if (state == 8) endstate += "Insufficient Material";
-        if (state == 9) endstate += "Fify-Move-Rule";
-        if (state == 10) endstate += "Threefold Repetition";
-        if (state == 11) endstate += "Draw Vote";
-        if (state == 12) endstate += "Timeout";
-        Debug.Log(endstate);
     }
     private void spawnPiece(char letter,Vector2Int cell)
     {

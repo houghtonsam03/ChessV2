@@ -35,7 +35,7 @@ public class Move
     }
     public override string ToString()
     {
-        string s = ChessEngine.CellToString(StartSquare) + ChessEngine.CellToString(TargetSquare);
+        string s = ChessGame.CellToString(StartSquare) + ChessGame.CellToString(TargetSquare);
         
         s += $":  {promotionPiece}, {castling}, {enpassant}";
 

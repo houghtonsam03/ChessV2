@@ -51,7 +51,7 @@
   <ItemGroup>
     <Compile Include="Assets\Scripts\PlayerListener.cs" />
     <Compile Include="Assets\Scripts\Board.cs" />
-    <Compile Include="Assets\Scripts\ChessEngine.cs" />
+    <Compile Include="Assets\Scripts\ChessGame.cs" />
     <Compile Include="Assets\Scripts\ChessAgent.cs" />
     <Compile Include="Assets\Scripts\BoardUI.cs" />
     <Compile Include="Assets\Scripts\RandomAgent.cs" />
