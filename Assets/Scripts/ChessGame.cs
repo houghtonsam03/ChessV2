@@ -6,6 +6,7 @@ using UnityEngine;
 public class ChessGame : MonoBehaviour
 {
     public bool Graphics;
+    public float MoveDelay;
     public ChessAgent Agent1;
     public ChessAgent Agent2;
     public enum Player1Side {White,Black,Random};
@@ -23,6 +24,8 @@ public class ChessGame : MonoBehaviour
     private float playerTimer;
     private float whiteTimer;
     private float blackTimer;
+    private float delayTime;
+
     // Chess variables
     private string gameState;
     private List<Move> moves;
@@ -116,9 +119,12 @@ public class ChessGame : MonoBehaviour
         else {agents[0] = Instantiate(Agent1); agents[0].StartAgent(player1Colour);}
         if (Agent2 == null) agents[1] = null;
         else {agents[1] = Instantiate(Agent2); agents[1].StartAgent(Piece.GetOpponentColour(player1Colour));}
+
+        // Start Timers
         TimeLimit *= 60;
         whiteTimer = TimeLimit; blackTimer = TimeLimit;
         playerTimer = Time.realtimeSinceStartup;
+        delayTime = 0f;
 
         // Spawn BoardUI and PlayerListener if we want graphics
         if (Graphics || agents[0] == null || agents[1] == null)
@@ -133,6 +139,7 @@ public class ChessGame : MonoBehaviour
             bool[] human = new bool[]{agents[turnIndex]==null,agents[turnIndex^1]==null};
             playerListener.Setup(this,boardUI,human);
         }
+        else MoveDelay = 0f;
     }
     public void Reset()
     {
@@ -152,6 +159,10 @@ public class ChessGame : MonoBehaviour
                     playerListener.EndGame();
                 }
                 endState = state;
+                return;
+            }
+            if (delayTime < MoveDelay) {
+                delayTime += Time.deltaTime;
                 return;
             }
 
@@ -191,6 +202,7 @@ public class ChessGame : MonoBehaviour
             if (Graphics || agents[0] == null || agents[1] == null) {
                 boardUI.setState(Board.BoardToFen(board));
                 playerListener.EndTurn();
+                delayTime = 0f;
             }
             // Debugging
             // Debug.Log(board);
