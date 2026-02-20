@@ -14,23 +14,21 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     private BoardUI board;
     // Selection Logic
     private int selectedID = -1;
-    private bool[] isHuman;
+    private bool[] isHuman = new bool[2];
     private int promotionCell = -1;
-    private int turn;
-    private int colour;
-    public bool gameOver;
+    private int turn = 0;
+    private int colour = Piece.white;
+    private bool gameOver = false;
     public void Setup(ChessGame en,BoardUI bo,bool[] human)
     {
         game = en;
         board = bo;
-        isHuman = new bool[2];
         isHuman[0] = human[0]; isHuman[1] = human[1];
-        turn = 0;
-        colour = Piece.white;
     }
     public void Update()
     {
-        if (Keyboard.current.spaceKey.wasPressedThisFrame) ResetGame();
+        if (Keyboard.current.spaceKey.wasPressedThisFrame) UndoMove();
+        if (Keyboard.current.enterKey.wasPressedThisFrame) ResetGame();
     }
     public void OnPointerDown(PointerEventData eventData)
     {
@@ -155,9 +153,8 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         if (0 > cell.x || cell.x > 7 || 0 > cell.y || cell.y > 7) return true;
         return false;
     }
-    public void DebugMethod()
+    public void UndoMove()
     {
-        Debug.Log("Debug");
         game.UndoMoves();
     }
     public void ResetGame()
@@ -169,5 +166,8 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         turn ^= 1;
         colour ^= 0b_11000;
     }
-
+    public void EndGame()
+    {
+        gameOver = true;
+    }
 }

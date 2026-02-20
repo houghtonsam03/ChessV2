@@ -381,8 +381,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d7930b7c3b92aa54283b591900138c04, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  Graphics: 0
-  Agent1: {fileID: 11400000, guid: 47f5340a55944af449c9dd90c2873553, type: 2}
+  Graphics: 1
+  Agent1: {fileID: 0}
   Agent2: {fileID: 11400000, guid: 47f5340a55944af449c9dd90c2873553, type: 2}
   PlayerOneSide: 0
   TimeLimit: 5

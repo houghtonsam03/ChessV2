@@ -128,7 +128,7 @@ public class ChessGame : MonoBehaviour
             boardObject.transform.parent = this.transform;
             boardUI = boardObject.GetComponent<BoardUI>();
             boardUI.readBoard(board);
-            playerListener = boardUI.AddComponent<PlayerListener>();
+            playerListener = boardUI.GetComponent<PlayerListener>();
             int turnIndex = Piece.IsColour(player1Colour,board.colourToMove) ? 0 : 1;
             bool[] human = new bool[]{agents[turnIndex]==null,agents[turnIndex^1]==null};
             playerListener.Setup(this,boardUI,human);
@@ -149,7 +149,7 @@ public class ChessGame : MonoBehaviour
                 board.gameOver = true;
                 if (Graphics || agents[0] == null || agents[1] == null) {
                     boardUI.DrawGameOver(state,board.FindKing(player1Colour),board.FindKing(Piece.GetOpponentColour(player1Colour)));
-                    playerListener.gameOver = true;
+                    playerListener.EndGame();
                 }
                 endState = state;
                 return;
