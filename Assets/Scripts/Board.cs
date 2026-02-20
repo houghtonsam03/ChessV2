@@ -4,18 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using static ChessGame;
 
-public class Board
-{
-    public int[] Square = new int[64];
-    public int colourToMove = 8;
-    public bool[] castling = new bool[4]{true,true,true,true}; // {White Kingside,White Queenside,Black Kingside,Black Queenside}
-    public int enpassant = -1; // the square on which an En Passant Move is possible. (Behind the pawn that moved 2 squares.) 
-    public int halfmove = 0;
-    public int fullmove = 1;
-    public  bool gameOver = false;
-    // Logic variables
-    private List<LastMove> lastMoves;
-    public struct LastMove
+public struct LastMove
     {
         public Move Move;
         public int CapturedPiece;
@@ -34,7 +23,23 @@ public class Board
             FullMove = full;
         }
     }
+public class Board
+{
+    public int[] Square = new int[64];
+    public int colourToMove = 8;
+    public bool[] castling = new bool[4]{true,true,true,true}; // {White Kingside,White Queenside,Black Kingside,Black Queenside}
+    public int enpassant = -1; // the square on which an En Passant Move is possible. (Behind the pawn that moved 2 squares.) 
+    public int halfmove = 0;
+    public int fullmove = 1;
+    public  bool gameOver = false;
+    // Logic variables
+    private List<LastMove> lastMoves;
+    private List<int> whitePieces;
+    private List<int> blackPieces;
+    
+    // Standard Fenstrings
     public static readonly string startingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    // Hash variables
     public List<ulong> positionHistory = new List<ulong>();
     public ulong zobristKey;
     public Board()

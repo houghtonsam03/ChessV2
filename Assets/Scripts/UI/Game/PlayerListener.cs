@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-
+using UnityEditor.EngineDiagnostics;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -16,7 +16,8 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     private int selectedID = -1;
     private bool[] isHuman;
     private int promotionCell = -1;
-    public int turn;
+    private int turn;
+    private int colour;
     public bool gameOver;
     public void Setup(ChessGame en,BoardUI bo,bool[] human)
     {
@@ -25,6 +26,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         isHuman = new bool[2];
         isHuman[0] = human[0]; isHuman[1] = human[1];
         turn = 0;
+        colour = Piece.white;
     }
     public void Update()
     {
@@ -40,7 +42,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(eventData.position);
         Vector2Int cell = BoardUI.WorldToCell(mousePos);
         int cellID = BoardUI.CellToID(cell);
-        if (IsOOB(mousePos) && selectedID >= 0) board.ResetPiecePos(selectedID);
+        if (IsOOB(mousePos) && selectedID >= 0) UnSelect();
         else if (promotionCell >= 0)
         {
             int promotionPiece = GetPromotionPiece(mousePos);
@@ -53,8 +55,8 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
             }
             else UnSelect();
         }
-        else if (cellID == selectedID) UnSelect();
-        else if (selectedID == -1 && promotionCell == -1) Select(cellID,eventData.position);
+        else if (selectedID == -1 && promotionCell == -1) Select(cellID);
+        else if (selectedID >= 0 && game.hasPiece(cellID,colour)) {UnSelect(); Select(cellID);}
         else if (IsPromotionMove(cellID) && game.HasLegalMove(selectedID,cellID))
         {
             SpawnPromotionUI(cellID);
@@ -68,6 +70,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
             game.MakeMove(move);
             UnSelect();
         }
+        else UnSelect();
     }
 
     public void OnPointerUp(PointerEventData eventData)
@@ -110,13 +113,12 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         }
         else board.PieceFollowMousePos(selectedID,eventData.position);
     }
-    public void Select(int ID,Vector3 pos)
+    public void Select(int ID)
     {
-        if (!game.hasPiece(ID,true)) return;
+        if (!game.hasPiece(ID,colour)) return;
         selectedID = ID;
         List<Move> moves = game.GetLegalMoves(ID);
         board.PaintMoves(ID,moves);
-        board.PieceFollowMousePos(selectedID,pos);
     }
     public void UnSelect()
     {
@@ -145,7 +147,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     public bool IsPromotionMove(int targetID)
     {
         bool lastRank = ChessGame.GetRank(targetID) == (turn^1)*7;
-        return game.hasPiece(selectedID,true,Piece.Pawn) && lastRank;
+        return game.hasPiece(selectedID,colour,Piece.Pawn) && lastRank;
     }
     public bool IsOOB(Vector3 pos)
     {
@@ -161,6 +163,11 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     public void ResetGame()
     {
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+    public void EndTurn()
+    {
+        turn ^= 1;
+        colour ^= 0b_11000;
     }
 
 }

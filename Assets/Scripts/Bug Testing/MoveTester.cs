@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -11,14 +12,9 @@ public class MoveTester : MonoBehaviour
     private Board board;
     void Start()
     {
-        if (testFen == null) testFen = Board.startingFen;
+        if (testFen == "") testFen = Board.startingFen;
         board = new Board();
         board.setPos(testFen);
-        GameObject prefab = Resources.Load<GameObject>("ChessboardPrefab");
-        GameObject boardObject = Instantiate(prefab,Vector3.zero,Quaternion.identity);
-        boardObject.transform.parent = this.transform;
-        BoardUI boardUI = boardObject.GetComponent<BoardUI>();
-        boardUI.readBoard(board);
     }
     void Update()
     {
@@ -26,7 +22,7 @@ public class MoveTester : MonoBehaviour
         {
             float timeStart = Time.realtimeSinceStartup;
             long nodes = Perft(board,n);
-            Debug.Log($"Perft({n}) = {nodes} ( {Time.realtimeSinceStartup-timeStart} sec)");
+            this.transform.Find("TextFrame").Find("Text").GetComponent<TextMeshProUGUI>().text += $"Perft({n}) = {nodes} ( {Time.realtimeSinceStartup-timeStart} sec)\n";
             n++;
         }
     }

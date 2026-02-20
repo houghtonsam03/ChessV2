@@ -142,27 +142,6 @@ public class ChessGame : MonoBehaviour
         if (board == null) return;
         if (!board.gameOver)
         {   
-            if (Piece.IsColour(board.colourToMove,Piece.white)) whiteTimer -= Time.realtimeSinceStartup - playerTimer;
-            else blackTimer -= Time.realtimeSinceStartup - playerTimer;
-            playerTimer = Time.realtimeSinceStartup;
-            // Debug.Log($"WhiteTime: {whiteTimer} | BlackTime: {blackTimer}");
-            
-            // Find the index of the player whose turn it is.
-            int turnIndex = Piece.IsColour(player1Colour,board.colourToMove) ? 0 : 1;
-            ChessAgent agent = agents[turnIndex];
-            if (agent == null) // Human
-            {
-                // We wait for playerListener to make move.
-                return;
-            }
-
-            else // AI Agent
-            {
-                // Main AI Loop
-                Move move = agent.GetMove(board);
-                MakeMove(move);
-            }
-
             // Check for GameOver
             int state = board.IsGameOver(whiteTimer,blackTimer);
             if (state != 0)
@@ -175,19 +154,31 @@ public class ChessGame : MonoBehaviour
                 endState = state;
                 return;
             }
+
+            if (Piece.IsColour(board.colourToMove,Piece.white)) whiteTimer -= Time.realtimeSinceStartup - playerTimer;
+            else blackTimer -= Time.realtimeSinceStartup - playerTimer;
+            playerTimer = Time.realtimeSinceStartup;
+            
+            // Find the index of the player whose turn it is.
+            int turnIndex = Piece.IsColour(player1Colour,board.colourToMove) ? 0 : 1;
+            ChessAgent agent = agents[turnIndex];
+            if (agent == null) // Human
+            {
+                // We wait for playerListener to make move.
+            }
+            else // AI Agent
+            {
+                // Main AI Loop
+                Move move = agent.GetMove(board);
+                MakeMove(move);
+            }
         }
     }
-    public bool hasPiece(int cell,bool moveColour)
+    public bool hasPiece(int cell,int moveColour=24,int pieceType=0)
     {
         // Chess Logic
-        if (moveColour) return Piece.IsColour(board.Square[cell],board.colourToMove);
-        else return !Piece.IsType(board.Square[cell],Piece.None);
-    }
-    public bool hasPiece(int cell,bool moveColour,int pieceType)
-    {
-        // Chess Logic
-        if (moveColour) return Piece.IsColour(board.Square[cell],board.colourToMove) && Piece.IsType(board.Square[cell],pieceType);
-        else return Piece.IsType(board.Square[cell],pieceType);
+        if (pieceType==0) return Piece.IsColour(board.Square[cell],moveColour);
+        else return Piece.IsColour(board.Square[cell],moveColour) && Piece.IsType(board.Square[cell],pieceType);
     }
     public void MakeMove(Move move)
     {
@@ -195,12 +186,11 @@ public class ChessGame : MonoBehaviour
         {
             // Update Engine
             board.MakeMove(move);
-            moves = GenerateMoves(board,board.colourToMove);
+            moves = GenerateMoves(board,board.colourToMove);  // TO BE OPTIMISED
             // Update dependencies
-            UpdateState();
             if (Graphics || agents[0] == null || agents[1] == null) {
-                boardUI.setState(gameState);
-                playerListener.turn ^= 1;
+                boardUI.setState(Board.BoardToFen(board));
+                playerListener.EndTurn();
             }
             // Debugging
             // Debug.Log(board);
