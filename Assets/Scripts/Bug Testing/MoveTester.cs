@@ -29,7 +29,7 @@ public class MoveTester : MonoBehaviour
     public static long Perft(Board board,int depth)
     {
 
-        List<Move> moves = ChessGame.GenerateMoves(board,board.colourToMove);
+        List<Move> moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
         if (depth == 1) return moves.Count;
         long nodes = 0;
         for (int i=0;i<moves.Count;i++)

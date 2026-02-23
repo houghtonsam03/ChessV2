@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using Unity.Collections;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class ChessGame : MonoBehaviour
 {
@@ -19,6 +21,7 @@ public class ChessGame : MonoBehaviour
     private ChessAgent[] agents;
     private BoardUI boardUI;
     private PlayerListener playerListener;
+    private bool UI = false;
 
     // Timer variables;
     private float playerTimer;
@@ -31,82 +34,16 @@ public class ChessGame : MonoBehaviour
     private List<Move> moves;
     private Board board;
     private int endState;
-
-    // Movement variables
-    public static readonly int[] directionOffsets = {8,-8,-1,1,7,-9,9,-7};
-    public static readonly int[][] NumSquaresToEdge = new int[64][];
-    public static readonly List<Move>[] knightMoves = new List<Move>[64];
-    private static void PrecomputeMoveData()
-    {
-        for (int x = 0; x<8;x++)
-        {
-            for (int y=0;y<8;y++)
-            {
-                int numUp = 7 - y;
-                int numDown = y;
-                int numLeft = x;
-                int numRight = 7 - x;
-
-                int cellID = 8*y+x;
-
-                NumSquaresToEdge[cellID] = new int[]{
-                    numUp,
-                    numDown,
-                    numLeft,
-                    numRight,
-                    Math.Min(numUp,numLeft),
-                    Math.Min(numDown,numLeft),
-                    Math.Min(numUp,numRight),
-                    Math.Min(numDown,numRight)
-                };
-                int[][] knightMoveCells = new int[][]
-                {
-                    new int[]{x-1,y+2},
-                    new int[]{x+1,y+2},
-                    new int[]{x-1,y-2},
-                    new int[]{x+1,y-2},
-                    new int[]{x-2,y+1},
-                    new int[]{x-2,y-1},
-                    new int[]{x+2,y+1},
-                    new int[]{x+2,y-1}
-                };
-                knightMoves[cellID] = new List<Move>();
-                foreach (int[] move in knightMoveCells)
-                {
-                    if (move[0] < 0 || move[0] > 7 || move[1] < 0 || move[1] > 7) continue;
-                    knightMoves[cellID].Add(new Move(Piece.Knight,cellID,move[1]*8+move[0]));
-                }
-            }
-        }
-    }
-    // Zobrist values
-    public static readonly ulong[] ZobristKeys = new ulong[12*64+1+4+8];
-    private static void PrecomputeZobristData()
-    {
-        System.Random rand = new System.Random(23); // Fixed seed
-        for (int i=0;i<12*64+1+4+8;i++)
-        {
-            ZobristKeys[i] = RandomUlong(rand);
-        }
-    }
-    private static ulong RandomUlong(System.Random rnd) {
-        byte[] buffer = new byte[8];
-        rnd.NextBytes(buffer);
-        return System.BitConverter.ToUInt64(buffer, 0);
-    }
+    // Debugging variables
+    private int n;
     
-    static ChessGame()
-    {
-        PrecomputeMoveData();
-        PrecomputeZobristData();
-    }
     void Start()
     {
         // Initial gameState
         gameState = Board.startingFen;
         board = new Board();
         board.setPos(gameState);
-        moves = GenerateMoves(board,board.colourToMove);
+        moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
 
         // Set Side
         if (PlayerOneSide == Player1Side.White) player1Colour = Piece.white;
@@ -129,6 +66,7 @@ public class ChessGame : MonoBehaviour
         // Spawn BoardUI and PlayerListener if we want graphics
         if (Graphics || agents[0] == null || agents[1] == null)
         {
+            UI  = true;
             GameObject prefab = Resources.Load<GameObject>("ChessboardPrefab");
             GameObject boardObject = Instantiate(prefab,Vector3.zero,Quaternion.identity);
             boardObject.transform.parent = this.transform;
@@ -141,9 +79,6 @@ public class ChessGame : MonoBehaviour
         }
         else MoveDelay = 0f;
     }
-    public void Reset()
-    {
-    }
     void Update()
     {
         if (board == null) return;
@@ -154,7 +89,7 @@ public class ChessGame : MonoBehaviour
             if (state != 0)
             {
                 board.gameOver = true;
-                if (Graphics || agents[0] == null || agents[1] == null) {
+                if (UI) {
                     boardUI.DrawGameOver(state,board.FindKing(player1Colour),board.FindKing(Piece.GetOpponentColour(player1Colour)));
                     playerListener.EndGame();
                 }
@@ -185,11 +120,20 @@ public class ChessGame : MonoBehaviour
             }
         }
     }
-    public bool hasPiece(int cell,int moveColour=24,int pieceType=0)
+    public bool hasPiece(int cell,int moveColour=24,int pieceType=Piece.None)
     {
-        // Chess Logic
-        if (pieceType==0) return Piece.IsColour(board.Square[cell],moveColour);
-        else return Piece.IsColour(board.Square[cell],moveColour) && Piece.IsType(board.Square[cell],pieceType);
+        if (pieceType == Piece.None)
+        {
+            bool white = (moveColour & Piece.white) != 0;
+            bool black = (moveColour & Piece.black) != 0;
+            if (white && Bitboard.HasBit(board.bitboards[12],cell)) return true;
+            if (black && Bitboard.HasBit(board.bitboards[13],cell)) return true;
+            return false;
+        }
+        int pieceMask = pieceType-1;
+        if (Piece.IsColour(moveColour,Piece.white) && Bitboard.HasBit(board.bitboards[pieceMask],cell)) return true;
+        if (Piece.IsColour(moveColour,Piece.black) && Bitboard.HasBit(board.bitboards[pieceMask+6],cell)) return true;
+        return false;
     }
     public void MakeMove(Move move)
     {
@@ -197,9 +141,9 @@ public class ChessGame : MonoBehaviour
         {
             // Update Engine
             board.MakeMove(move);
-            moves = GenerateMoves(board,board.colourToMove);  // TO BE OPTIMISED
+            moves = MoveGenerator.GenerateMoves(board,board.colourToMove);  // TO BE OPTIMISED
             // Update dependencies
-            if (Graphics || agents[0] == null || agents[1] == null) {
+            if (UI) {
                 boardUI.setState(Board.BoardToFen(board));
                 playerListener.EndTurn();
                 delayTime = 0f;
@@ -223,7 +167,7 @@ public class ChessGame : MonoBehaviour
         // Returns the move from the moves list that is equal to mv
         foreach (Move move in moves)
         {
-            Move mv = new Move(board.Square[start],start,target,promotionPiece);
+            Move mv = new Move(start,target,promotionPiece);
             if (move == mv) return move;
         }
         return null;
@@ -234,13 +178,13 @@ public class ChessGame : MonoBehaviour
     }
     public bool IsLegalMove(int start, int target, int promotionPiece)
     {
-        return moves.Contains(new Move(board.Square[start],start,target,promotionPiece));
+        return moves.Contains(new Move(start,target,promotionPiece));
     }
     public bool HasLegalMove(int start, int target)
     {
         foreach (Move move in moves)
         {
-            Move mv = new Move(board.Square[start],start,target);
+            Move mv = new Move(start,target);
             if (move.StartSquare == mv.StartSquare && move.TargetSquare == mv.TargetSquare) return true;
         }
         return false;
@@ -266,185 +210,23 @@ public class ChessGame : MonoBehaviour
     {
         // Debugging for undoing two moves
         board.UndoMove();
-        moves = GenerateMoves(board,board.colourToMove);
+        moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
         board.UndoMove();
-        moves = GenerateMoves(board,board.colourToMove);
+        moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
         UpdateState();
-        if (Graphics || agents[0] == null || agents[1] == null) boardUI.readBoard(board);
-        moves = GenerateMoves(board,board.colourToMove);
+        if (UI) boardUI.readBoard(board);
+        moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
     }
-    public static List<Move> GenerateMoves(Board board,int colour=Piece.white+Piece.black, int type=0)
+    public void DebugBitboard()
     {
-        List<Move> allMoves = new List<Move>();
-        for (int i=0;i<64;i++)
-        {
-            if (!Piece.IsColour(board.Square[i],colour)) continue;
-            if (type == 0) // Don't care about type
-            {
-                List<Move> squareMoves = GenerateMove(board,i);
-                SolvePseudoMoves(board,squareMoves);
-                allMoves.AddRange(squareMoves);
-            }
-            else
-            {
-                if (!Piece.IsType(board.Square[i],type)) continue;
-                List<Move> squareMoves = GenerateMove(board,i);
-                SolvePseudoMoves(board,squareMoves);
-                allMoves.AddRange(squareMoves);
-            }
-
-        }
-        return allMoves;
-    }
-    public static List<Move> GenerateMove(Board board,int start,bool includeCastling = true)
-    {
-        int piece = board.Square[start];
-        List<Move> mv = new List<Move>();
-        if (Piece.IsSlidingPiece(piece))
-        {
-            GenerateSlidingMoves(board,mv,start,piece);
-        }
-        else if (Piece.IsType(piece,Piece.King))
-        {
-            GenerateKingMoves(board,mv,start,piece,includeCastling);
-        }
-        else if (Piece.IsType(piece,Piece.Pawn))
-        {
-            GeneratePawnMoves(board,mv,start,piece);
-        }
-        else if (Piece.IsType(piece,Piece.Knight))
-        {
-            GenerateKnightMoves(board,mv,start,piece);
-        }
-        return mv;
-    }
-    public static void GenerateSlidingMoves(Board board,List<Move> mv,int startCell, int piece)
-    {
-        int startDirIndex = Piece.IsType(piece,Piece.Bishop) ? 4 : 0;
-        int endDirIndex = Piece.IsType(piece,Piece.Rook) ? 4 : 8;
-        for (int directionIndex = startDirIndex; directionIndex<endDirIndex;directionIndex++)
-        {
-            for (int n=1;n <= NumSquaresToEdge[startCell][directionIndex];n++)
-            {
-                int targetCell = startCell + directionOffsets[directionIndex] * n;
-                int pieceOnTarget = board.Square[targetCell];
-
-                if (Piece.IsColour(pieceOnTarget,Piece.GetColour(piece))) // Same colour piece
-                {
-                    break;
-                }
-                mv.Add(new Move(piece,startCell,targetCell));
-                
-                if (Piece.IsColour(pieceOnTarget,Piece.GetOpponentColour(piece)))
-                {
-                    break;
-                }
-            }
-        }
-    }
-    public static void GenerateKingMoves(Board board,List<Move> mv,int startCell, int piece,bool includeCastling)
-    {
-        for (int i=0;i<8;i++)
-        {   
-            if (NumSquaresToEdge[startCell][i] == 0) continue;
-            int targetCell = startCell + directionOffsets[i];
-            int targetPiece = board.Square[targetCell];
-            if (Piece.IsColour(targetPiece,Piece.GetColour(piece))) continue;
-            mv.Add(new Move(piece,startCell,targetCell));
-        }
-        if (!includeCastling) return;
-        // Castling
-        // If castling is allowed and squares between are and not under attack clear we can castle.
-        if (board.IsCheck(Piece.GetColour(piece))) return;
-        int teamOffset = Piece.IsColour(piece, Piece.white) ? 0 : 2;
-        int rankOffset = Piece.IsColour(piece, Piece.white) ? 0 : 56;
-        // Kingside
-        if (board.castling[0+teamOffset])
-        {
-            if (!board.IsAttacked(rankOffset+5,Piece.GetOpponentColour(piece)) && Piece.IsType(board.Square[rankOffset+5],Piece.None) &&
-                !board.IsAttacked(rankOffset+6,Piece.GetOpponentColour(piece)) && Piece.IsType(board.Square[rankOffset+6],Piece.None))
-            {
-                mv.Add(new Move(piece,startCell,rankOffset+6,Piece.None,true,false));
-            }
-        }
-        // Queenside
-        if (board.castling[1+teamOffset])
-        {
-            if (Piece.IsType(board.Square[rankOffset+1],Piece.None) &&
-                !board.IsAttacked(rankOffset+2,Piece.GetOpponentColour(piece)) && Piece.IsType(board.Square[rankOffset+2],Piece.None) &&
-                !board.IsAttacked(rankOffset+3,Piece.GetOpponentColour(piece)) && Piece.IsType(board.Square[rankOffset+3],Piece.None))
-            {
-                mv.Add(new Move(piece,startCell,rankOffset+2,Piece.None,true,false));
-            }
-        }
-    }
-    public static void GeneratePawnMoves(Board board,List<Move> mv,int startCell, int piece)
-    {
-        // Check diagonal capture and En Passant
-        int team = (Piece.GetColour(piece)/8)-1;
-        int lastRank = Piece.GetColour(piece) == Piece.white ? 7 : 0;
-
-        int[] captureDirIndex = new int[]{4+team,6+team}; // Index for diagonal movements.
-        foreach (int dirIndex in captureDirIndex)
-        {
-            if (NumSquaresToEdge[startCell][dirIndex] == 0) continue;
-            int captureCell = startCell + directionOffsets[dirIndex];
-            int capturePiece = board.Square[captureCell];
-            if (Piece.IsColour(capturePiece,Piece.GetOpponentColour(piece)) && capturePiece != Piece.None)
-            {
-                if (GetRank(captureCell) == lastRank)
-                {
-                    mv.Add(new Move(piece,startCell,captureCell,Piece.Queen));
-                    mv.Add(new Move(piece,startCell,captureCell,Piece.Rook));
-                    mv.Add(new Move(piece,startCell,captureCell,Piece.Knight));
-                    mv.Add(new Move(piece,startCell,captureCell,Piece.Bishop));
-                }
-                else mv.Add(new Move(piece,startCell,captureCell));
-            }
-            if (board.enpassant == captureCell) mv.Add(new Move(piece,startCell,captureCell,Piece.None,false,true));
-        }
-
-        // Check pawn move 1 step.
-        int targetCell = startCell + directionOffsets[team];
-        int targetPiece = board.Square[targetCell];
-        if (targetPiece != 0) return;
-        if (GetRank(targetCell) == lastRank)
-        {
-            mv.Add(new Move(piece,startCell,targetCell,Piece.Queen));
-            mv.Add(new Move(piece,startCell,targetCell,Piece.Rook));
-            mv.Add(new Move(piece,startCell,targetCell,Piece.Knight));
-            mv.Add(new Move(Piece.Pawn,startCell,targetCell,Piece.Bishop));
-        } 
-        else mv.Add(new Move(piece,startCell,targetCell));
-
-        // Check pawn move 2 step.
-        if ((GetRank(startCell) == 1 && Piece.IsColour(piece,Piece.white)) || (GetRank(startCell) == 6 && Piece.IsColour(piece,Piece.black)))
-        {
-            targetCell = startCell + directionOffsets[team] * 2;
-            targetPiece = board.Square[targetCell];
-            if (targetPiece == 0) mv.Add(new Move(piece,startCell,targetCell));
-        } 
-    }
-    public static void GenerateKnightMoves(Board board,List<Move> mv,int startCell, int piece)
-    {
-        foreach (Move move in knightMoves[startCell])
-        {
-            int targetPiece = board.Square[move.TargetSquare];
-            if (Piece.IsColour(targetPiece,Piece.GetColour(piece))) continue;
-            mv.Add(move);
-        }
-    }
-    public static void SolvePseudoMoves(Board board,List<Move> mvs)
-    {
-        for(int i = mvs.Count-1;i >= 0;i--)
-        {
-            Move move = mvs[i];
-            int kingColour = board.colourToMove;
-
-            board.MakeMove(move);
-            if (board.IsCheck(kingColour)) mvs.Remove(move);
-            board.UndoMove();
-        }
+        n += 1;
+        n %= 20;
+        if (n==0) boardUI.ColorTiles();
+        else if (n <= 15) boardUI.DrawBitboard(board.bitboards[n-1]);
+        else if (n == 16) boardUI.DrawBitboard(board.whiteAttacks);
+        else if (n == 17) boardUI.DrawBitboard(board.blackAttacks);
+        else if (n == 18) boardUI.DrawBitboard(board.whitePins);
+        else if (n == 19) boardUI.DrawBitboard(board.blackPins);
     }
     public static int GetRank(int startSquare)
     {
@@ -461,13 +243,21 @@ public class ChessGame : MonoBehaviour
         int x = cellID%8 , y = cellID/8;
         return ""+col[x]+row[y];
     }
+    public static int CellToID(int x,int y)
+    {
+        return 8*y+x;
+    }
+    public static (int x, int y) IDToCell(int cellID)
+    {
+        return (cellID%8,cellID/8);
+    }
     public static int StringToID(string square)
     {
         List<char> files = new List<char>();
         files.AddRange(new char[]{'a','b','c','d','e','f','g','h'});
         int y = files.IndexOf(square.ToCharArray()[0]) - 1;
         int x = square.ToCharArray()[1]-'0';
-        return BoardUI.CellToID(new Vector2Int(x,y));
+        return CellToID(x,y);
     }
     public static void PrintState(int state)
     {

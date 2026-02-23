@@ -4,7 +4,6 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
-using static ChessGame;
 
 public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHandler , IDragHandler
 {
@@ -27,7 +26,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     }
     public void Update()
     {
-        if (Keyboard.current.spaceKey.wasPressedThisFrame) UndoMove();
+        if (Keyboard.current.spaceKey.wasPressedThisFrame) DrawBitboard();
         if (Keyboard.current.enterKey.wasPressedThisFrame) ResetGame();
     }
     public void OnPointerDown(PointerEventData eventData)
@@ -39,7 +38,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         // This runs whenever mouse1 is pressed
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(eventData.position);
         Vector2Int cell = BoardUI.WorldToCell(mousePos);
-        int cellID = BoardUI.CellToID(cell);
+        int cellID = ChessGame.CellToID(cell.x,cell.y);
         if (IsOOB(mousePos) && selectedID >= 0) UnSelect();
         else if (promotionCell >= 0)
         {
@@ -79,7 +78,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
 
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(eventData.position);
         Vector2Int cell = BoardUI.WorldToCell(mousePos);
-        int cellID = BoardUI.CellToID(cell);
+        int cellID = ChessGame.CellToID(cell.x,cell.y);
 
         // If move is oob or no legal move -> reset the piece.
         if (IsOOB(mousePos)) board.ResetPiecePos(selectedID);
@@ -128,7 +127,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     }
     public void SpawnPromotionUI(int ID)
     {
-        int colour = (BoardUI.IDToCell(ID).y == 7) ? Piece.white : Piece.black;
+        int colour = (ChessGame.IDToCell(ID).y == 7) ? Piece.white : Piece.black;
         promotionCell = ID;
         board.ResetPiecePos(selectedID);
         board.SpawnPromotionTile(ID,colour);
@@ -160,6 +159,10 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     public void ResetGame()
     {
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+    private void DrawBitboard()
+    {
+        game.DebugBitboard();
     }
     public void EndTurn()
     {

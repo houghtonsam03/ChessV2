@@ -62,7 +62,7 @@ public class BoardUI : MonoBehaviour
                 }
                 else
                 {
-                    spawnPiece(letter,new Vector2Int(x,y));
+                    spawnPiece(letter,ChessGame.CellToID(x,y));
                     x++;
                 }
             }
@@ -72,20 +72,16 @@ public class BoardUI : MonoBehaviour
     public void readBoard(Board b)
     {
         CleanBoard();
-        for (int i=0;i<64;i++)
+        char[] letters = new char[]{'K','P','N','B','R','Q','k','p','n','b','r','q'};
+        for (int i=0;i<12;i++)
         {
-            int piece = b.Square[i];
-            if (piece == 0) continue;
-            char s = ' ';
-            if (Piece.GetType(piece) == 1) s = 'k';
-            if (Piece.GetType(piece) == 2) s = 'p';
-            if (Piece.GetType(piece) == 3) s = 'n';
-            if (Piece.GetType(piece) == 4) s = 'b';
-            if (Piece.GetType(piece) == 5) s = 'r';
-            if (Piece.GetType(piece) == 6) s = 'q';
-            if (Piece.GetColour(piece) == 8) s = char.ToUpper(s);
-            Vector2Int cell = IDToCell(i);
-            spawnPiece(s,cell);
+            ulong bitboard = b.bitboards[i];
+            char letter = letters[i];
+            while (bitboard != 0)
+            {
+                int cell = Bitboard.PopLowestBit(ref bitboard);
+                spawnPiece(letter,cell);
+            }
         }
     }
     public void Move(int start, int target)
@@ -94,8 +90,8 @@ public class BoardUI : MonoBehaviour
         tiles[start].piece = null;
         Destroy(tiles[target].piece);
         tiles[target].piece = piece;
-        Vector2Int targetCell = IDToCell(target);
-        piece.transform.position = CellToWorld(targetCell);
+        var (x,y) = ChessGame.IDToCell(target);
+        piece.transform.position = CellToWorld(x,y);
     }
     public void PieceFollowMousePos(int cellID,Vector3 position)
     {
@@ -112,16 +108,15 @@ public class BoardUI : MonoBehaviour
             {
                 for (int y=0;y<8;y++)
                 {
-                    Tile tile = tiles[CellToID(new Vector2Int(x,y))];
+                    Tile tile = tiles[ChessGame.CellToID(x,y)];
                     if (tile.piece == null) continue;
-                    tile.piece.transform.position = CellToWorld(new Vector2Int(x,y));
+                    tile.piece.transform.position = CellToWorld(x,y);
                 }
             }
 
             return;
         }
-        Vector2Int cell = IDToCell(cellID);
-        tiles[cellID].piece.transform.position = CellToWorld(cell);
+        tiles[cellID].piece.transform.position = IDToWorld(cellID);
     }
     public void PaintMoves(int startID,List<Move> moves)
     {
@@ -146,9 +141,11 @@ public class BoardUI : MonoBehaviour
         else return;
         tiles[whitePos].cell.GetComponent<SpriteRenderer>().color = c1;
         tiles[blackPos].cell.GetComponent<SpriteRenderer>().color = c2;
+        ChessGame.PrintState(state);
     }
-    private void spawnPiece(char letter,Vector2Int cell)
+    private void spawnPiece(char letter,int cell)
     {
+        
         string prefab = "";
         if (char.IsUpper(letter)) prefab += "White ";
         else prefab += "Black ";
@@ -159,9 +156,9 @@ public class BoardUI : MonoBehaviour
         if (char.ToLower(letter) == 'q') prefab += "Queen";
         if (char.ToLower(letter) == 'k') prefab += "King";
         GameObject piecePrefab = Resources.Load<GameObject>(prefab);
-        GameObject piece = Instantiate(piecePrefab,CellToWorld(cell),Quaternion.identity);
+        GameObject piece = Instantiate(piecePrefab,IDToWorld(cell),Quaternion.identity);
         piece.name = prefab;
-        tiles[CellToID(cell)].piece = piece;
+        tiles[cell].piece = piece;
         piece.transform.parent = pieces.transform;
 
     }
@@ -203,7 +200,7 @@ public class BoardUI : MonoBehaviour
             for (int y=0;y<8;y++)
             {
                 Color col = (x + y) % 2 == 0 ? color1 : color2;
-                tiles[CellToID(new Vector2Int(x,y))].cell.GetComponent<SpriteRenderer>().color = col;
+                tiles[ChessGame.CellToID(x,y)].cell.GetComponent<SpriteRenderer>().color = col;
             }
         }
     }
@@ -240,22 +237,24 @@ public class BoardUI : MonoBehaviour
             promotionTile = null;
         }
     }
-    public static Vector3 CellToWorld(Vector2Int cell)
+    public void DrawBitboard(ulong bitboard)
+    {
+        for (int i=0;i<64;i++)
+        {
+            Color col = Color.blue;
+            if (Bitboard.HasBit(bitboard,i)) col = Color.red;
+            tiles[i].cell.GetComponent<SpriteRenderer>().color = col;
+        }
+    }
+    public static Vector3 CellToWorld(int x,int y)
     {
         // x,y in (0-7)
-        return new Vector3(cell.x-3.5f,cell.y-3.5f,0);
-    }
-    public static int CellToID(Vector2Int cell)
-    {
-        return 8*cell.y+cell.x;
-    }
-    public static Vector2Int IDToCell(int cellID)
-    {
-        return new Vector2Int(cellID%8,cellID/8);
+        return new Vector3(x-3.5f,y-3.5f,0);
     }
     public static Vector3 IDToWorld(int cellID)
     {
-        return CellToWorld(IDToCell(cellID));
+        var (x, y) = ChessGame.IDToCell(cellID);
+        return CellToWorld(x,y);
     }
     public static Vector2Int WorldToCell(Vector3 worldPos)
     {

@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using static ChessGame;
 using Random = System.Random;
 
 
@@ -16,7 +15,7 @@ public class RandomAgent : ChessAgent
     }
     public override Move GetMove(Board board)
     {
-        List<Move> moves = GenerateMoves(board,colour);
+        List<Move> moves = MoveGenerator.GenerateMoves(board,colour);
 
         Random rand = new Random();
         return moves[rand.Next(moves.Count)];

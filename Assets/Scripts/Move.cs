@@ -6,9 +6,8 @@ public class Move
     public readonly int promotionPiece;
     public readonly bool castling;
     public readonly bool enpassant;
-    public Move(int piece,int start,int target,int promotion=0,bool cast=false,bool enpass=false)
+    public Move(int start,int target,int promotion=0,bool cast=false,bool enpass=false)
     {
-        movingPiece = piece;
         StartSquare = start;
         TargetSquare = target;
         promotionPiece = promotion;
