@@ -19,8 +19,10 @@ public class ChessGame : MonoBehaviour
     // System variables
     private int player1Colour;
     private ChessAgent[] agents;
+    private float[] evals;
     private BoardUI boardUI;
     private PlayerListener playerListener;
+    private ChessTimer timers;
     private bool UI = false;
 
     // Timer variables;
@@ -52,10 +54,11 @@ public class ChessGame : MonoBehaviour
         
         // Start agents
         agents = new ChessAgent[2]{Agent1,Agent2};
+        evals = new float[2];
         if (Agent1 == null) agents[0] = null;
-        else {agents[0] = Instantiate(Agent1); agents[0].StartAgent(player1Colour);}
+        else {agents[0] = Instantiate(Agent1); agents[0].StartAgent(player1Colour); evals[0] = agents[0].EvalPos(board);}
         if (Agent2 == null) agents[1] = null;
-        else {agents[1] = Instantiate(Agent2); agents[1].StartAgent(Piece.GetOpponentColour(player1Colour));}
+        else {agents[1] = Instantiate(Agent2); agents[1].StartAgent(Piece.GetOpponentColour(player1Colour)); evals[1] = agents[1].EvalPos(board);}
 
         // Start Timers
         TimeLimit *= 60;
@@ -67,15 +70,25 @@ public class ChessGame : MonoBehaviour
         if (Graphics || agents[0] == null || agents[1] == null)
         {
             UI  = true;
-            GameObject prefab = Resources.Load<GameObject>("ChessboardPrefab");
+            // Chessboard
+            GameObject prefab = Resources.Load<GameObject>("Chessboard");
             GameObject boardObject = Instantiate(prefab,Vector3.zero,Quaternion.identity);
             boardObject.transform.parent = this.transform;
             boardUI = boardObject.GetComponent<BoardUI>();
             boardUI.readBoard(board);
+
+            // Player Input Listener
             playerListener = boardUI.GetComponent<PlayerListener>();
             int turnIndex = Piece.IsColour(player1Colour,board.colourToMove) ? 0 : 1;
             bool[] human = new bool[]{agents[turnIndex]==null,agents[turnIndex^1]==null};
             playerListener.Setup(this,boardUI,human);
+        
+            // Chess Timer
+            prefab = Resources.Load<GameObject>("ChessTimer");
+            GameObject timerObject = Instantiate(prefab,Vector3.zero,Quaternion.identity);
+            timerObject.transform.parent = this.transform;
+            timers = timerObject.GetComponent<ChessTimer>();
+            timers.Setup(whiteTimer,blackTimer);
         }
         else MoveDelay = 0f;
     }
@@ -84,6 +97,13 @@ public class ChessGame : MonoBehaviour
         if (board == null) return;
         if (!board.gameOver)
         {   
+            // Update graphics
+            if (UI)
+            {
+                boardUI.setState(Board.BoardToFen(board));
+                timers.UpdateTimes(whiteTimer,blackTimer);
+            }
+
             // Check for GameOver
             int state = board.IsGameOver(whiteTimer,blackTimer);
             if (state != 0)
@@ -96,16 +116,16 @@ public class ChessGame : MonoBehaviour
                 endState = state;
                 return;
             }
+            // Update timers
             if (delayTime < MoveDelay) {
                 delayTime += Time.deltaTime;
                 return;
             }
-
             if (Piece.IsColour(board.colourToMove,Piece.white)) whiteTimer -= Time.realtimeSinceStartup - playerTimer;
             else blackTimer -= Time.realtimeSinceStartup - playerTimer;
             playerTimer = Time.realtimeSinceStartup;
             
-            // Find the index of the player whose turn it is.
+            // Ask Agent for move
             int turnIndex = Piece.IsColour(player1Colour,board.colourToMove) ? 0 : 1;
             ChessAgent agent = agents[turnIndex];
             if (agent == null) // Human
@@ -115,8 +135,9 @@ public class ChessGame : MonoBehaviour
             else // AI Agent
             {
                 // Main AI Loop
-                Move move = agent.GetMove(board);
+                (Move move,float eval) = agent.GetMove(board);
                 MakeMove(move);
+                evals[turnIndex] = eval;
             }
         }
     }
@@ -144,7 +165,6 @@ public class ChessGame : MonoBehaviour
             moves = MoveGenerator.GenerateMoves(board,board.colourToMove);  // TO BE OPTIMISED
             // Update dependencies
             if (UI) {
-                boardUI.setState(Board.BoardToFen(board));
                 playerListener.EndTurn();
                 delayTime = 0f;
             }

@@ -27,7 +27,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     public void Update()
     {
         if (Keyboard.current.spaceKey.wasPressedThisFrame) DrawBitboard();
-        if (Keyboard.current.enterKey.wasPressedThisFrame) ResetGame();
+        if (Keyboard.current.enterKey.wasPressedThisFrame) ResetScene();
     }
     public void OnPointerDown(PointerEventData eventData)
     {
@@ -156,13 +156,15 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     {
         game.UndoMoves();
     }
-    public void ResetGame()
-    {
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-    }
+    
+    
     private void DrawBitboard()
     {
         game.DebugBitboard();
+    }
+    private void ResetScene()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
     public void EndTurn()
     {

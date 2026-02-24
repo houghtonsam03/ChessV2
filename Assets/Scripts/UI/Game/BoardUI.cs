@@ -1,11 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using TMPro;
 using Unity.Collections;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class BoardUI : MonoBehaviour
 {
@@ -19,6 +21,8 @@ public class BoardUI : MonoBehaviour
     private GameObject TileGrid;
     private GameObject pieces;
     private GameObject promotionTile;
+    private TextMeshProUGUI[] ranks;
+    private TextMeshProUGUI[] files;
 
     private struct Tile
     {
@@ -34,6 +38,13 @@ public class BoardUI : MonoBehaviour
         pieces = this.transform.GetChild(1).gameObject;
         CreateBoard();
         this.transform.name = "Chessboard";
+        ranks = new TextMeshProUGUI[8];
+        files = new TextMeshProUGUI[8];
+        for (int i=0;i<8;i++)
+        {
+            files[i] = tiles[i].cell.transform.Find("File").Find("Text").GetComponent<TextMeshProUGUI>();
+            ranks[i] = tiles[8*i].cell.transform.Find("Rank").Find("Text").GetComponent<TextMeshProUGUI>();
+        }
     }
     void OnValidate()
     {
@@ -202,6 +213,12 @@ public class BoardUI : MonoBehaviour
                 Color col = (x + y) % 2 == 0 ? color1 : color2;
                 tiles[ChessGame.CellToID(x,y)].cell.GetComponent<SpriteRenderer>().color = col;
             }
+        }
+        for (int i=0;i<8;i++)
+        {
+            Color col = i % 2 == 0 ? color2 : color1;
+            ranks[i].color = col;
+            files[i].color = col;
         }
     }
     public void SpawnPromotionTile(int cellID,int colour)

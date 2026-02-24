@@ -13,15 +13,19 @@ public class RandomAgent : ChessAgent
     {
         colour = col;
     }
-    public override Move GetMove(Board board)
+    public override (Move,float) GetMove(Board board)
     {
         List<Move> moves = MoveGenerator.GenerateMoves(board,colour);
 
         Random rand = new Random();
-        return moves[rand.Next(moves.Count)];
+        return (moves[rand.Next(moves.Count)],0f);
     }
     public override string GetColour()
     {
         return Piece.IsColour(colour,Piece.white) ? "White" : "Black";
+    }
+    public override float EvalPos(Board board)
+    {
+        return 0f;
     }
 }
