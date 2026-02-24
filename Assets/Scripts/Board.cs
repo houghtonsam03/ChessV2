@@ -368,7 +368,7 @@ public class Board
         int offset = (colour == Piece.white) ? 0 : 6;
         // Kings
         int kingSquare = FindKing(colour);
-        attacks |= MoveGenerator.PrecomputedMove.kingAttacks[kingSquare];
+        attacks |= MoveGenerator.KingAttacks[kingSquare];
         // Pawns
         ulong pawns = bitboards[1 + offset];
         if (colour == Piece.white)
@@ -386,7 +386,7 @@ public class Board
         while (knights != 0)
         {
             int sq = Bitboard.PopLowestBit(ref knights);
-            attacks |= MoveGenerator.PrecomputedMove.knightAttacks[sq];
+            attacks |= MoveGenerator.KnightAttacks[sq];
         }
         // Sliders (Bishop,Rook,Queen)
         ulong bishops = bitboards[3 + offset] | bitboards[5 + offset];
@@ -414,9 +414,9 @@ public class Board
         int endDir = diagonal ? 8 : 4;
         for (int dirIndex = startDir;dirIndex<endDir;dirIndex++)
         {
-            for (int n=1; n<=MoveGenerator.PrecomputedMove.numSquaresToEdge[square][dirIndex];n++)
+            for (int n=1; n<=MoveGenerator.NumSquaresToEdge[square*8+dirIndex];n++)
             {
-                int target = square + MoveGenerator.PrecomputedMove.directionOffset[dirIndex] * n;
+                int target = square + MoveGenerator.DirectionOffset[dirIndex] * n;
                 attacks |= (1UL << target);
                 if ((occupied & (1UL << target)) != 0) break;
             }
@@ -440,9 +440,9 @@ public class Board
             ulong rayMask = 0;
             int friendlyCount = 0;
 
-            for (int n = 1; n <= MoveGenerator.PrecomputedMove.numSquaresToEdge[kingSquare][dirIndex]; n++)
+            for (int n = 1; n <= MoveGenerator.NumSquaresToEdge[kingSquare*8+dirIndex]; n++)
             {
-                int target = kingSquare + MoveGenerator.PrecomputedMove.directionOffset[dirIndex] * n;
+                int target = kingSquare + MoveGenerator.DirectionOffset[dirIndex] * n;
                 ulong targetBit = 1UL << target;
                 rayMask |= targetBit;
 
