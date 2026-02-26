@@ -132,19 +132,21 @@ public class ChessGame : MonoBehaviour
         if (IsLegalMove(move))
         {
             // Update Engine
+            bool isWhite = board.colourToMove == Piece.white;
+            bool isCapture = move.enpassant || Bitboard.HasBit(board.bitboards[14],move.TargetSquare);
             board.MakeMove(move);
+            bool isCheck = board.IsCheck(board.colourToMove);
             moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
             turnIndex ^= 1;
             endState = board.IsGameOver(whiteTimer,blackTimer);
             // Update dependencies
             if (UI != null) {
-                Debug.Log("GRAPHICS");
-                UI.EndTurn();
+                UI.EndTurn(move,isWhite,isCheck,isCapture);
                 delayTime = 0f;
             }
             // Debugging
-            Debug.Log(board);
-            Debug.Log(move);
+            // Debug.Log(board);
+            // Debug.Log(move);
 
         }
         // Debug Logic

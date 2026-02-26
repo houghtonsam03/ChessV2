@@ -1,10 +1,13 @@
+using NUnit.Framework;
 using UnityEngine;
+using static ChessSound;
 
 public class GameUI : MonoBehaviour
 {
     private ChessGame game;
     private BoardUI boardUI;
     private PlayerListener playerListener;
+    private ChessSound sound;
     private ChessTimer chessTimer;
 
     public void Setup(ChessGame g,Board board,bool p1White,ChessAgent[] agents,float[] evals,float TimeLimit)
@@ -23,6 +26,14 @@ public class GameUI : MonoBehaviour
         // Player Input Listener
         playerListener = boardUI.GetComponent<PlayerListener>();
         playerListener.Setup(game,boardUI,this,p1White,agents);
+
+        // Sound
+        prefab = Resources.Load<GameObject>("Speaker");
+        GameObject speakerObject = Instantiate(prefab,Vector3.zero,Quaternion.identity);
+        speakerObject.transform.parent = gameObject.transform;
+        sound = boardUI.GetComponent<ChessSound>();
+        sound.SetSpeaker(speakerObject.GetComponent<AudioSource>());
+        sound.PlayStartSound();
     
         // Chess Timer
         prefab = Resources.Load<GameObject>("ChessTimer");
@@ -30,15 +41,22 @@ public class GameUI : MonoBehaviour
         timerObject.transform.parent = gameObject.transform;
         chessTimer = timerObject.GetComponent<ChessTimer>();
         chessTimer.Setup(TimeLimit,TimeLimit);
+
     }
     public void UpdateGraphics(Board board,float whiteTime,float blackTime)
     {
         boardUI.readBoard(board);
         chessTimer.UpdateTimes(whiteTime,blackTime);
     }
-    public void EndTurn()
+    public void EndTurn(Move move,bool isWhite,bool isCheck, bool isCapture)
     {
         playerListener.EndTurn();
+        if (isCheck) PlaySound(Sound.Check);
+        else if (move.castling) PlaySound(Sound.Castle);
+        else if (move.promotionPiece != 0) PlaySound(Sound.Promotion);
+        else if (isCapture) PlaySound(Sound.Capture);
+        else if (isWhite) PlaySound(Sound.MoveWhite);
+        else if (!isWhite) PlaySound(Sound.MoveBlack);
     }
     public void EndGame(int state,int whiteKingPos,int blackKingPos)
     {
@@ -51,9 +69,18 @@ public class GameUI : MonoBehaviour
         ChessGame.PrintState(state);
         boardUI.DrawGameOver(winner,whiteKingPos,blackKingPos);
         playerListener.EndGame();
+        sound.PlayGameoverSound();
     }
     public void DrawBitboard(ulong bitboard)
     {
         boardUI.DrawBitboard(bitboard);
     }
+    public void PlaySound(int s)
+    {
+        if (s < Sound.End) sound.PlayMoveSound(s);
+        else if (s == Sound.TimeOut) sound.PlayTimeoutSound();
+        else if (s == Sound.Illegal) sound.PlayIllegalSound();
+        else if (s == Sound.Premove) sound.PlayPremoveSound(); 
+    }
+    
 }

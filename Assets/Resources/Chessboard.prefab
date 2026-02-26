@@ -3844,6 +3844,7 @@ GameObject:
   - component: {fileID: 8354884153904299659}
   - component: {fileID: 5980731100215089315}
   - component: {fileID: 8282142429947877723}
+  - component: {fileID: 560704695527064064}
   m_Layer: 0
   m_Name: Chessboard
   m_TagString: Untagged
@@ -3945,6 +3946,29 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62932507de97f4247a8e0ae1198be607, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerListener
+--- !u!114 &560704695527064064
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5877756106826727421}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 24c08eb8259835f499ab623f24702fad, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Sound
+  gameStart: {fileID: 8300000, guid: 0cb60f4306434634fa3e66ea75362777, type: 3}
+  moveWhite: {fileID: 8300000, guid: 55c0183c84c668247aa32a014f5131d2, type: 3}
+  moveBlack: {fileID: 8300000, guid: 86eefcd32f9f3f74592e4ed38645fe26, type: 3}
+  capture: {fileID: 8300000, guid: dfab4d3da3c5e744eb72839179eb5a41, type: 3}
+  promotion: {fileID: 8300000, guid: 1ab523b5822ab82478d08a967bb28b31, type: 3}
+  castle: {fileID: 8300000, guid: b3e961a243da7274981ba0bfeb56a71f, type: 3}
+  check: {fileID: 8300000, guid: 2e69a741d9b3f6146a36438b2c63a51c, type: 3}
+  gameOver: {fileID: 8300000, guid: 1570984241157a541b0815dfd3e1d000, type: 3}
+  timeout: {fileID: 8300000, guid: a524d557f75feff4d9c91564c1f10c30, type: 3}
+  illegal: {fileID: 8300000, guid: 81145aa7e4dbcbc46bef4e8221cbd417, type: 3}
+  premove: {fileID: 8300000, guid: b0608a07edd6b434c8ac0841615a67a8, type: 3}
 --- !u!1 &5890338386615304228
 GameObject:
   m_ObjectHideFlags: 0
