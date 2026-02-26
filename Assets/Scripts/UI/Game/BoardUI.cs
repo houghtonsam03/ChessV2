@@ -141,18 +141,19 @@ public class BoardUI : MonoBehaviour
     {
         tiles[selectID].cell.GetComponent<SpriteRenderer>().color = highlightColor;
     }
-    public void DrawGameOver(int state,int whitePos,int blackPos)
+    public void DrawGameOver(int winner,int whitePos,int blackPos)
     {
         ColorTiles();
-        Color c1;
-        Color c2;
-        if (1 <= state && state <= 3) {c1=Color.green; c2=Color.red;}
-        else if (4 <= state && state <= 6) {c1=Color.red; c2=Color.green;}
-        else if (7 <= state && state <= 12) {c1=Color.yellow; c2=Color.yellow;}
-        else return;
+        Color c1 = Color.pink; // Debug color
+        Color c2 = Color.pink; // Debug color
+        switch (winner)
+        {
+            case 0 : c1=Color.yellow; c2=Color.yellow; break;
+            case 1 : c1=Color.green; c2=Color.red; break;
+            case 2 : c1=Color.red; c2=Color.green; break;
+        }
         tiles[whitePos].cell.GetComponent<SpriteRenderer>().color = c1;
         tiles[blackPos].cell.GetComponent<SpriteRenderer>().color = c2;
-        ChessGame.PrintState(state);
     }
     private void spawnPiece(char letter,int cell)
     {

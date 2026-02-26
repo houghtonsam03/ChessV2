@@ -9,9 +9,9 @@ public class RandomAgent : ChessAgent
     // Game Information
     private int colour;
     
-    public override void StartAgent(int col)
+    public override void StartAgent(bool white)
     {
-        colour = col;
+        colour = white ? Piece.white : Piece.black;
     }
     public override (Move,float) GetMove(Board board)
     {

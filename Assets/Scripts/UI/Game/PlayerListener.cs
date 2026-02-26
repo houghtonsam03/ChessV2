@@ -10,19 +10,22 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
 
     // Game Objects
     private ChessGame game;
+    private GameUI UI;
     private BoardUI board;
     // Selection Logic
     private int selectedID = -1;
     private bool[] isHuman = new bool[2];
     private int promotionCell = -1;
-    private int turn = 0;
+    private int turn;
     private int colour = Piece.white;
     private bool gameOver = false;
-    public void Setup(ChessGame en,BoardUI bo,bool[] human)
+    public void Setup(ChessGame g,BoardUI b,GameUI ui,bool p1White,ChessAgent[] agents)
     {
-        game = en;
-        board = bo;
-        isHuman[0] = human[0]; isHuman[1] = human[1];
+        game = g;
+        board = b;
+        UI = ui;
+        turn = p1White ? 0 : 1;
+        isHuman[0] = agents[0] == null; isHuman[1] = agents[1] == null;
     }
     public void Update()
     {
@@ -104,8 +107,6 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         // Runs when pressed down cursor moves
         if (selectedID == -1) return;
         if (gameOver) {
-            board.ResetPiecePos(selectedID);
-            board.RemovePromotionTile();
             UnSelect();
         }
         else board.PieceFollowMousePos(selectedID,eventData.position);

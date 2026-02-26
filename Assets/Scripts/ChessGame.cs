@@ -17,116 +17,85 @@ public class ChessGame : MonoBehaviour
     
 
     // System variables
-    private int player1Colour;
+    private bool player1White;
     private ChessAgent[] agents;
     private float[] evals;
-    private BoardUI boardUI;
-    private PlayerListener playerListener;
-    private ChessTimer timers;
-    private bool UI = false;
+    private GameUI UI;
 
     // Timer variables;
-    private float playerTimer;
     private float whiteTimer;
     private float blackTimer;
     private float delayTime;
 
     // Chess variables
-    private string gameState;
+    private string gameFen;
     private List<Move> moves;
     private Board board;
     private int endState;
+    private int turnIndex;
+
     // Debugging variables
     private int n;
     
     void Start()
     {
         // Initial gameState
-        gameState = Board.startingFen;
+        gameFen = Board.startingFen;
         board = new Board();
-        board.setPos(gameState);
+        board.setPos(gameFen);
         moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
 
         // Set Side
-        if (PlayerOneSide == Player1Side.White) player1Colour = Piece.white;
-        if (PlayerOneSide == Player1Side.Black) player1Colour = Piece.black;
-        if (PlayerOneSide == Player1Side.Random) player1Colour = UnityEngine.Random.value < 0.5f ? Piece.white : Piece.black;
+        switch (PlayerOneSide)
+        {
+            case Player1Side.White : player1White = true; break;
+            case Player1Side.Black : player1White = false; break;
+            case Player1Side.Random : player1White = UnityEngine.Random.value < 0.5f; break;
+        }
+        turnIndex = player1White ? 0 : 1;
         
         // Start agents
         agents = new ChessAgent[2]{Agent1,Agent2};
         evals = new float[2];
         if (Agent1 == null) agents[0] = null;
-        else {agents[0] = Instantiate(Agent1); agents[0].StartAgent(player1Colour); evals[0] = agents[0].EvalPos(board);}
+        else {agents[0] = Instantiate(Agent1); agents[0].StartAgent(player1White); evals[0] = agents[0].EvalPos(board);}
         if (Agent2 == null) agents[1] = null;
-        else {agents[1] = Instantiate(Agent2); agents[1].StartAgent(Piece.GetOpponentColour(player1Colour)); evals[1] = agents[1].EvalPos(board);}
+        else {agents[1] = Instantiate(Agent2); agents[1].StartAgent(!player1White); evals[1] = agents[1].EvalPos(board);}
 
         // Start Timers
         TimeLimit *= 60;
         whiteTimer = TimeLimit; blackTimer = TimeLimit;
-        playerTimer = Time.realtimeSinceStartup;
         delayTime = 0f;
 
         // Spawn BoardUI and PlayerListener if we want graphics
         if (Graphics || agents[0] == null || agents[1] == null)
         {
-            UI  = true;
-            // Chessboard
-            GameObject prefab = Resources.Load<GameObject>("Chessboard");
-            GameObject boardObject = Instantiate(prefab,Vector3.zero,Quaternion.identity);
-            boardObject.transform.parent = this.transform;
-            boardUI = boardObject.GetComponent<BoardUI>();
-            boardUI.readBoard(board);
-
-            // Player Input Listener
-            playerListener = boardUI.GetComponent<PlayerListener>();
-            int turnIndex = Piece.IsColour(player1Colour,board.colourToMove) ? 0 : 1;
-            bool[] human = new bool[]{agents[turnIndex]==null,agents[turnIndex^1]==null};
-            playerListener.Setup(this,boardUI,human);
-        
-            // Chess Timer
-            prefab = Resources.Load<GameObject>("ChessTimer");
-            GameObject timerObject = Instantiate(prefab,Vector3.zero,Quaternion.identity);
-            timerObject.transform.parent = this.transform;
-            timers = timerObject.GetComponent<ChessTimer>();
-            timers.Setup(whiteTimer,blackTimer);
+            UI = this.AddComponent<GameUI>();
+            UI.Setup(this,board,player1White,agents,evals,TimeLimit);
         }
         else MoveDelay = 0f;
     }
     void Update()
     {
         if (board == null) return;
-        if (!board.gameOver)
+        if (!board.gameOver && delayTime >= MoveDelay)
         {   
             // Update graphics
-            if (UI)
-            {
-                boardUI.setState(Board.BoardToFen(board));
-                timers.UpdateTimes(whiteTimer,blackTimer);
-            }
+            if (UI != null) UI.UpdateGraphics(board,whiteTimer,blackTimer);
 
             // Check for GameOver
-            int state = board.IsGameOver(whiteTimer,blackTimer);
-            if (state != 0)
+            if (endState != 0)
             {
                 board.gameOver = true;
-                if (UI) {
-                    boardUI.DrawGameOver(state,board.FindKing(player1Colour),board.FindKing(Piece.GetOpponentColour(player1Colour)));
-                    playerListener.EndGame();
-                }
-                endState = state;
+                if (UI != null) UI.EndGame(endState,board.FindKing(Piece.white),board.FindKing(Piece.black));
                 return;
             }
+
             // Update timers
-            if (delayTime < MoveDelay) {
-                delayTime += Time.deltaTime;
-                return;
-            }
-            if (Piece.IsColour(board.colourToMove,Piece.white)) whiteTimer -= Time.realtimeSinceStartup - playerTimer;
-            else blackTimer -= Time.realtimeSinceStartup - playerTimer;
-            playerTimer = Time.realtimeSinceStartup;
+            if (board.colourToMove == Piece.white) whiteTimer -= Time.deltaTime;
+            else if (board.colourToMove == Piece.black) blackTimer -= Time.deltaTime;
             
             // Ask Agent for move
-            int turnIndex = Piece.IsColour(player1Colour,board.colourToMove) ? 0 : 1;
             ChessAgent agent = agents[turnIndex];
             if (agent == null) // Human
             {
@@ -138,8 +107,10 @@ public class ChessGame : MonoBehaviour
                 (Move move,float eval) = agent.GetMove(board);
                 MakeMove(move);
                 evals[turnIndex] = eval;
+                delayTime = 0f;
             }
         }
+        delayTime += Time.deltaTime;
     }
     public bool hasPiece(int cell,int moveColour=24,int pieceType=Piece.None)
     {
@@ -162,15 +133,18 @@ public class ChessGame : MonoBehaviour
         {
             // Update Engine
             board.MakeMove(move);
-            moves = MoveGenerator.GenerateMoves(board,board.colourToMove);  // TO BE OPTIMISED
+            moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
+            turnIndex ^= 1;
+            endState = board.IsGameOver(whiteTimer,blackTimer);
             // Update dependencies
-            if (UI) {
-                playerListener.EndTurn();
+            if (UI != null) {
+                Debug.Log("GRAPHICS");
+                UI.EndTurn();
                 delayTime = 0f;
             }
             // Debugging
-            // Debug.Log(board);
-            // Debug.Log(move);
+            Debug.Log(board);
+            Debug.Log(move);
 
         }
         // Debug Logic
@@ -211,7 +185,7 @@ public class ChessGame : MonoBehaviour
     }
     private void UpdateState()
     {
-        gameState = Board.BoardToFen(board);
+        gameFen = Board.BoardToFen(board);
     }
     public List<Move> GetLegalMoves(int start)
     {
@@ -234,19 +208,19 @@ public class ChessGame : MonoBehaviour
         board.UndoMove();
         moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
         UpdateState();
-        if (UI) boardUI.readBoard(board);
+        if (UI != null) UI.UpdateGraphics(board,whiteTimer,blackTimer);
         moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
     }
     public void DebugBitboard()
     {
         n += 1;
         n %= 20;
-        if (n==0) boardUI.ColorTiles();
-        else if (n <= 15) boardUI.DrawBitboard(board.bitboards[n-1]);
-        else if (n == 16) boardUI.DrawBitboard(board.whiteAttacks);
-        else if (n == 17) boardUI.DrawBitboard(board.blackAttacks);
-        else if (n == 18) boardUI.DrawBitboard(board.whitePins);
-        else if (n == 19) boardUI.DrawBitboard(board.blackPins);
+        if (n==0) UI.UpdateGraphics(board,whiteTimer,blackTimer);
+        else if (n <= 15) UI.DrawBitboard(board.bitboards[n-1]);
+        else if (n == 16) UI.DrawBitboard(board.whiteAttacks);
+        else if (n == 17) UI.DrawBitboard(board.blackAttacks);
+        else if (n == 18) UI.DrawBitboard(board.whitePins);
+        else if (n == 19) UI.DrawBitboard(board.blackPins);
     }
     public static int GetRank(int startSquare)
     {
