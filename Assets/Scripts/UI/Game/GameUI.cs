@@ -8,9 +8,9 @@ public class GameUI : MonoBehaviour
     private BoardUI boardUI;
     private PlayerListener playerListener;
     private ChessSound sound;
-    private ChessTimer chessTimer;
+    private LeftUI leftUI;
 
-    public void Setup(ChessGame g,Board board,bool p1White,ChessAgent[] agents,float[] evals,float TimeLimit)
+    public void Setup(ChessGame g,Board board,bool p1White,ChessAgent[] agents,float? whiteEval,float? blackEval,float TimeLimit)
     {
         // Chess Game
         game = g;
@@ -18,7 +18,7 @@ public class GameUI : MonoBehaviour
 
         // Board UI
         GameObject prefab = Resources.Load<GameObject>("Chessboard");
-        GameObject boardObject = Instantiate(prefab,Vector3.zero,Quaternion.identity);
+        GameObject boardObject = Instantiate(prefab,prefab.transform.position,Quaternion.identity);
         boardObject.transform.parent = gameObject.transform;
         boardUI = boardObject.GetComponent<BoardUI>();
         boardUI.readBoard(board);
@@ -29,24 +29,26 @@ public class GameUI : MonoBehaviour
 
         // Sound
         prefab = Resources.Load<GameObject>("Speaker");
-        GameObject speakerObject = Instantiate(prefab,Vector3.zero,Quaternion.identity);
+        GameObject speakerObject = Instantiate(prefab,prefab.transform.position,Quaternion.identity);
         speakerObject.transform.parent = gameObject.transform;
         sound = boardUI.GetComponent<ChessSound>();
         sound.SetSpeaker(speakerObject.GetComponent<AudioSource>());
         sound.PlayStartSound();
     
         // Chess Timer
-        prefab = Resources.Load<GameObject>("ChessTimer");
-        GameObject timerObject = Instantiate(prefab,Vector3.zero,Quaternion.identity);
-        timerObject.transform.parent = gameObject.transform;
-        chessTimer = timerObject.GetComponent<ChessTimer>();
-        chessTimer.Setup(TimeLimit,TimeLimit);
+        prefab = Resources.Load<GameObject>("LeftUI");
+        GameObject timerObject = Instantiate(prefab,prefab.transform.position,Quaternion.identity);
+        timerObject.transform.SetParent(gameObject.transform);
+        leftUI = timerObject.GetComponent<LeftUI>();
+        leftUI.Setup(TimeLimit,TimeLimit,whiteEval,blackEval);
 
     }
-    public void UpdateGraphics(Board board,float whiteTime,float blackTime)
+    public void UpdateGraphics(Board board,float whiteTime,float blackTime,float? whiteEval, float? blackEval)
     {
         boardUI.readBoard(board);
-        chessTimer.UpdateTimes(whiteTime,blackTime);
+        leftUI.UpdateTimes(whiteTime,blackTime);
+        leftUI.UpdateEval(whiteEval,blackEval);
+
     }
     public void EndTurn(Move move,bool isWhite,bool isCheck, bool isCapture)
     {

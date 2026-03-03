@@ -62,7 +62,7 @@ public class ChessSound : MonoBehaviour
     {
         PlayClip(premove);
     }
-    public void PlayClip(AudioClip clip)
+    private void PlayClip(AudioClip clip)
     {
         if (!audioSource.isPlaying)
         {

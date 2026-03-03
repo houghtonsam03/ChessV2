@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.VisualScripting;
+using UnityEditor.ShaderGraph.Internal;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -19,7 +20,7 @@ public class ChessGame : MonoBehaviour
     // System variables
     private bool player1White;
     private ChessAgent[] agents;
-    private float[] evals;
+    private float?[] evals;
     private GameUI UI;
 
     // Timer variables;
@@ -56,7 +57,7 @@ public class ChessGame : MonoBehaviour
         
         // Start agents
         agents = new ChessAgent[2]{Agent1,Agent2};
-        evals = new float[2];
+        evals = new float?[2];
         if (Agent1 == null) agents[0] = null;
         else {agents[0] = Instantiate(Agent1); agents[0].StartAgent(player1White); evals[0] = agents[0].EvalPos(board);}
         if (Agent2 == null) agents[1] = null;
@@ -71,7 +72,9 @@ public class ChessGame : MonoBehaviour
         if (Graphics || agents[0] == null || agents[1] == null)
         {
             UI = this.AddComponent<GameUI>();
-            UI.Setup(this,board,player1White,agents,evals,TimeLimit);
+            float? whiteEval = player1White ? evals[0] : evals[1];
+            float? blackEval = player1White ? evals[1] : evals[0];
+            UI.Setup(this,board,player1White,agents,whiteEval,blackEval,TimeLimit);
         }
         else MoveDelay = 0f;
     }
@@ -81,7 +84,9 @@ public class ChessGame : MonoBehaviour
         if (!board.gameOver && delayTime >= MoveDelay)
         {   
             // Update graphics
-            if (UI != null) UI.UpdateGraphics(board,whiteTimer,blackTimer);
+            float? whiteEval = player1White ? evals[0] : evals[1];
+            float? blackEval = player1White ? evals[1] : evals[0];
+            if (UI != null) UI.UpdateGraphics(board,whiteTimer,blackTimer,whiteEval,blackEval);
 
             // Check for GameOver
             if (endState != 0)
@@ -104,9 +109,13 @@ public class ChessGame : MonoBehaviour
             else // AI Agent
             {
                 // Main AI Loop
-                (Move move,float eval) = agent.GetMove(board);
+                Move move = agent.GetMove(board);
                 MakeMove(move);
-                evals[turnIndex] = eval;
+                for (int i=0;i<2;i++)
+                {
+                    if (agents[i] == null) continue;
+                    evals[i] = agents[i].EvalPos(board);
+                }
                 delayTime = 0f;
             }
         }
@@ -210,14 +219,18 @@ public class ChessGame : MonoBehaviour
         board.UndoMove();
         moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
         UpdateState();
-        if (UI != null) UI.UpdateGraphics(board,whiteTimer,blackTimer);
+        float? whiteEval = player1White ? evals[0] : evals[1];
+        float? blackEval = player1White ? evals[1] : evals[0];
+        if (UI != null) UI.UpdateGraphics(board,whiteTimer,blackTimer,whiteEval,blackEval);
         moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
     }
     public void DebugBitboard()
     {
         n += 1;
         n %= 20;
-        if (n==0) UI.UpdateGraphics(board,whiteTimer,blackTimer);
+        float? whiteEval = player1White ? evals[0] : evals[1];
+        float? blackEval = player1White ? evals[1] : evals[0];
+        if (n == 0) UI.UpdateGraphics(board,whiteTimer,blackTimer,whiteEval,blackEval);
         else if (n <= 15) UI.DrawBitboard(board.bitboards[n-1]);
         else if (n == 16) UI.DrawBitboard(board.whiteAttacks);
         else if (n == 17) UI.DrawBitboard(board.blackAttacks);
