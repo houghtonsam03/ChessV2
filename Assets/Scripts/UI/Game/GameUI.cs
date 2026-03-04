@@ -9,12 +9,16 @@ public class GameUI : MonoBehaviour
     private PlayerListener playerListener;
     private ChessSound sound;
     private LeftUI leftUI;
+    private RightUI rightUI;
+    private Board board;
 
-    public void Setup(ChessGame g,Board board,bool p1White,ChessAgent[] agents,float? whiteEval,float? blackEval,float TimeLimit)
+    public void Setup(ChessGame g,Board b,bool p1White,ChessAgent[] agents,float? whiteEval,float? blackEval,float TimeLimit)
     {
         // Chess Game
         game = g;
         GameObject gameObject = g.gameObject;
+        board = new Board();
+        board.setPos(b);
 
         // Board UI
         GameObject prefab = Resources.Load<GameObject>("Chessboard");
@@ -35,24 +39,38 @@ public class GameUI : MonoBehaviour
         sound.SetSpeaker(speakerObject.GetComponent<AudioSource>());
         sound.PlayStartSound();
     
-        // Chess Timer
+        // Left UI (Timers & Evals)
         prefab = Resources.Load<GameObject>("LeftUI");
-        GameObject timerObject = Instantiate(prefab,prefab.transform.position,Quaternion.identity);
-        timerObject.transform.SetParent(gameObject.transform);
-        leftUI = timerObject.GetComponent<LeftUI>();
+        GameObject leftObject = Instantiate(prefab,prefab.transform.position,Quaternion.identity);
+        leftObject.transform.SetParent(gameObject.transform);
+        leftUI = leftObject.GetComponent<LeftUI>();
         leftUI.Setup(TimeLimit,TimeLimit,whiteEval,blackEval);
 
-    }
-    public void UpdateGraphics(Board board,float whiteTime,float blackTime,float? whiteEval, float? blackEval)
-    {
-        boardUI.readBoard(board);
-        leftUI.UpdateTimes(whiteTime,blackTime);
-        leftUI.UpdateEval(whiteEval,blackEval);
+        // Right UI (Game History, New Game & Draw Offer/Resign)
+        prefab = Resources.Load<GameObject>("RightUI");
+        GameObject rightObject = Instantiate(prefab,prefab.transform.position,Quaternion.identity);
+        rightObject.transform.SetParent(gameObject.transform);
+        rightUI = rightObject.GetComponent<RightUI>();
+        rightUI.Setup();
 
     }
-    public void EndTurn(Move move,bool isWhite,bool isCheck, bool isCapture)
+    public void UpdateGraphics(float whiteTime,float blackTime,float? whiteEval, float? blackEval)
+    {
+        leftUI.UpdateTimes(whiteTime,blackTime);
+        leftUI.UpdateEval(whiteEval,blackEval);
+    }
+    public void EndTurn(Move move,bool isWhite,bool isCapture,bool isCheck, bool isCheckmate)
     {
         playerListener.EndTurn();
+
+        int movingPiece = board.GetPieceType(move.StartSquare);
+        string moveStr = Move.AlgebraicNotation(move,isCheck,isCheckmate,isCapture,movingPiece);
+        rightUI.UpdateHistory(moveStr,board.colourToMove==Piece.white);
+
+        board.MakeMove(move);
+        boardUI.readBoard(board);
+        
+
         if (isCheck) PlaySound(Sound.Check);
         else if (move.castling) PlaySound(Sound.Castle);
         else if (move.promotionPiece != 0) PlaySound(Sound.Promotion);

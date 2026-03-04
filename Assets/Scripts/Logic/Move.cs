@@ -1,6 +1,5 @@
 public class Move
 {
-    public readonly int movingPiece;
     public readonly int StartSquare;
     public readonly int TargetSquare;
     public readonly int promotionPiece;
@@ -38,4 +37,25 @@ public class Move
 
         return s;
     }
+    public static string AlgebraicNotation(Move move,bool isCheck,bool isCheckmate,bool isCapture,int movingPiece)
+    {
+        if (move.castling && ChessGame.GetRank(move.TargetSquare) == 2) return "O-O-O";
+        else if (move.castling && ChessGame.GetRank(move.TargetSquare) == 6) return "O-O";
+        string moveNote = "";
+        moveNote += Piece.IsType(movingPiece,Piece.Pawn) ? "" : Piece.ToString(movingPiece);
+        if (isCapture) 
+        {
+            if (Piece.IsType(movingPiece,Piece.Pawn))
+            {
+                string[] files = {"a","b","c","d","e","f","g","h"};
+                moveNote += files[ChessGame.GetFile(move.StartSquare)];
+            }
+            moveNote += "x";
+        }
+        moveNote += ChessGame.IDToString(move.TargetSquare);
+        if (move.promotionPiece != Piece.None) moveNote += Piece.ToString(move.promotionPiece);
+        if (isCheckmate) moveNote += "#";
+        else if (isCheck) moveNote += "+";
+        return moveNote; 
+    }   
 }

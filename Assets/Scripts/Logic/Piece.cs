@@ -38,4 +38,14 @@ public static class Piece
     {
         return GetColour(piece ^ 0b_11000);
     }
+    public static string ToString(int piece)
+    {
+        if (piece == Piece.None) return "";
+        else if (piece == Piece.King) return "K";
+        else if (piece == Piece.Pawn) return "P";
+        else if (piece == Piece.Knight) return "N";
+        else if (piece == Piece.Bishop) return "B";
+        else if (piece == Piece.Rook) return "R";
+        else return "Q";
+    }
 }

@@ -382,7 +382,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   Graphics: 1
-  MoveDelay: 0
+  MoveDelay: 0.3
   Agent1: {fileID: 11400000, guid: 47f5340a55944af449c9dd90c2873553, type: 2}
   Agent2: {fileID: 11400000, guid: 47f5340a55944af449c9dd90c2873553, type: 2}
   PlayerOneSide: 0

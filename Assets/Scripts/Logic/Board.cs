@@ -152,8 +152,8 @@ public class Board
         fullmove = b.fullmove;
         gameOver = b.gameOver;
 
-        bitboards = new ulong[12];
-        for (int i=0;i<12;i++) {bitboards[i] = b.bitboards[i];}
+        bitboards = new ulong[15];
+        for (int i=0;i<15;i++) {bitboards[i] = b.bitboards[i];}
         zobristKey = Zobrist.ZobristHash(this);
         positionHistory.Add(zobristKey);
     }
