@@ -13,7 +13,7 @@ public class LeftUI : MonoBehaviour
     private TextMeshProUGUI blackTimerText;
     private GameObject blackEvalObject;
     private TextMeshProUGUI blackEvalText;
-    public void Setup(float whiteTime, float blackTime,float? whiteEval, float? blackEval)
+    public void Setup(float whiteTime, float blackTime,float?[] evals)
     {
         whiteTimerText = this.gameObject.transform.Find("WhiteTimer").Find("WhiteTimerText").GetComponent<TextMeshProUGUI>();
         blackTimerText = this.gameObject.transform.Find("BlackTimer").Find("BlackTimerText").GetComponent<TextMeshProUGUI>();
@@ -22,15 +22,17 @@ public class LeftUI : MonoBehaviour
         whiteEvalText = this.gameObject.transform.Find("WhiteText").GetComponent<TextMeshProUGUI>();
         blackEvalText = this.gameObject.transform.Find("BlackText").GetComponent<TextMeshProUGUI>();
         UpdateTimes(whiteTime,blackTime);
-        UpdateEval(whiteEval,blackEval);
+        UpdateEval(evals);
     }
     public void UpdateTimes(float whiteTime, float blackTime)
     {
         whiteTimerText.text = ReformatTime(whiteTime);
         blackTimerText.text = ReformatTime(blackTime);
     }
-    public void UpdateEval(float? whiteEval, float? blackEval)
+    public void UpdateEval(float?[] evals)
     {
+        float? whiteEval = evals[0];
+        float? blackEval = evals[1];
         float whiteBarHeight = sigmoidEval(whiteEval);
         whiteEvalObject.transform.Find("White").GetComponent<LayoutElement>().flexibleHeight = whiteBarHeight;
         whiteEvalObject.transform.Find("Black").GetComponent<LayoutElement>().flexibleHeight = 1 - whiteBarHeight;

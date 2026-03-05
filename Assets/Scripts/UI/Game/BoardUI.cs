@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using TMPro;
 using Unity.Collections;
@@ -23,6 +24,7 @@ public class BoardUI : MonoBehaviour
     private GameObject promotionTile;
     private TextMeshProUGUI[] ranks;
     private TextMeshProUGUI[] files;
+    private bool isFlipped;
 
     private struct Tile
     {
@@ -36,25 +38,63 @@ public class BoardUI : MonoBehaviour
     {
         TileGrid = this.transform.GetChild(0).gameObject;
         pieces = this.transform.GetChild(1).gameObject;
-        CreateBoard();
-        this.transform.name = "Chessboard";
+        tiles = new Tile[64];
         ranks = new TextMeshProUGUI[8];
         files = new TextMeshProUGUI[8];
-        for (int i=0;i<8;i++)
-        {
-            files[i] = tiles[i].cell.transform.Find("File").Find("Text").GetComponent<TextMeshProUGUI>();
-            ranks[i] = tiles[8*i].cell.transform.Find("Rank").Find("Text").GetComponent<TextMeshProUGUI>();
-        }
+        this.transform.name = "Chessboard";
     }
     void OnValidate()
     {
         ColorTiles();
     }
-
-    IEnumerator WaitAndResetScene()
+    public void Setup(bool flipped)
     {
-        yield return new WaitForSeconds(0.2f);
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        isFlipped = flipped;
+        for (int x=0;x<8;x++)
+        {
+            for (int y=0;y<8;y++)
+            {
+                int cellID = 8*y+x;
+                bool rankNotation = (!isFlipped && x==0) || (isFlipped && x==7);
+                bool fileNotation = (!isFlipped && y==0) || (isFlipped && y==7);
+                Vector3 position = IDToWorld(cellID,isFlipped);
+                GameObject cell = SpawnTile(cellID,position,rankNotation,fileNotation);
+                tiles[cellID] = new Tile{x = x,y = y,cell = cell,piece=null};
+            }
+        }
+        int start = isFlipped ? 7 : 0;
+        for (int i=0;i<8;i++)
+        {
+            files[i] = tiles[start*8+i].cell.transform.Find("File").Find("Text").GetComponent<TextMeshProUGUI>();
+            ranks[i] = tiles[start+8*i].cell.transform.Find("Rank").Find("Text").GetComponent<TextMeshProUGUI>();
+        }
+        ColorTiles();
+    }
+    public GameObject SpawnTile(int cellID,Vector3 position,bool rank,bool file)
+    {
+        GameObject tilePrefab = Resources.Load<GameObject>("Tile");
+        position += TileGrid.transform.position;
+        GameObject tileObject = Instantiate(tilePrefab,position,Quaternion.identity);
+        string tile = ChessGame.IDToString(cellID);
+        if (rank)
+        {
+            GameObject rankPrefab = Resources.Load<GameObject>("Rank");
+            GameObject rankObject = Instantiate(rankPrefab,position,Quaternion.identity);
+            rankObject.transform.Find("Text").GetComponent<TextMeshProUGUI>().text = tile[1].ToString();
+            rankObject.transform.SetParent(tileObject.transform);
+            rankObject.transform.name = "Rank";
+        }
+        if (file)
+        {
+            GameObject fileprefab = Resources.Load<GameObject>("File");
+            GameObject fileObject = Instantiate(fileprefab,position,Quaternion.identity);
+            fileObject.transform.Find("Text").GetComponent<TextMeshProUGUI>().text = tile[0].ToString();
+            fileObject.transform.SetParent(tileObject.transform);
+            fileObject.transform.name = "File";
+        }
+        tileObject.transform.name = tile;
+        tileObject.transform.parent = TileGrid.transform;
+        return tileObject;
     }
     public void setState(string state)
     {
@@ -73,7 +113,7 @@ public class BoardUI : MonoBehaviour
                 }
                 else
                 {
-                    spawnPiece(letter,ChessGame.CellToID(x,y));
+                    SpawnPiece(letter,ChessGame.CellToID(x,y));
                     x++;
                 }
             }
@@ -91,18 +131,20 @@ public class BoardUI : MonoBehaviour
             while (bitboard != 0)
             {
                 int cell = Bitboard.PopLowestBit(ref bitboard);
-                spawnPiece(letter,cell);
+                SpawnPiece(letter,cell);
             }
         }
     }
-    public void Move(int start, int target)
+    public void UpdatePiece(int cellID,string piece)
     {
-        GameObject piece = tiles[start].piece;
-        tiles[start].piece = null;
-        Destroy(tiles[target].piece);
-        tiles[target].piece = piece;
-        var (x,y) = ChessGame.IDToCell(target);
-        piece.transform.position = CellToWorld(x,y);
+        if (piece == "") {
+            if (tiles[cellID].piece != null) Destroy(tiles[cellID].piece);
+            tiles[cellID].piece = null;
+        }
+        else
+        {
+            SpawnPiece(piece.ToCharArray()[0],cellID);
+        }
     }
     public void PieceFollowMousePos(int cellID,Vector3 position)
     {
@@ -115,19 +157,15 @@ public class BoardUI : MonoBehaviour
     {
         if (cellID == -1)
         {
-            for (int x=0;x<8;x++)
+            for (int cell=0;cell<64;cell++)
             {
-                for (int y=0;y<8;y++)
-                {
-                    Tile tile = tiles[ChessGame.CellToID(x,y)];
-                    if (tile.piece == null) continue;
-                    tile.piece.transform.position = CellToWorld(x,y);
-                }
+                if (tiles[cell].piece == null) continue;
+                tiles[cell].piece.transform.position = IDToWorld(cell,isFlipped);
             }
 
             return;
         }
-        tiles[cellID].piece.transform.position = IDToWorld(cellID);
+        tiles[cellID].piece.transform.position = IDToWorld(cellID,isFlipped);
     }
     public void PaintMoves(int startID,List<Move> moves)
     {
@@ -155,20 +193,23 @@ public class BoardUI : MonoBehaviour
         tiles[whitePos].cell.GetComponent<SpriteRenderer>().color = c1;
         tiles[blackPos].cell.GetComponent<SpriteRenderer>().color = c2;
     }
-    private void spawnPiece(char letter,int cell)
+    private void SpawnPiece(char letter,int cell)
     {
         
         string prefab = "";
         if (char.IsUpper(letter)) prefab += "White ";
         else prefab += "Black ";
-        if (char.ToLower(letter) == 'p') prefab += "Pawn";
-        if (char.ToLower(letter) == 'r') prefab += "Rook";
-        if (char.ToLower(letter) == 'n') prefab += "Knight";
-        if (char.ToLower(letter) == 'b') prefab += "Bishop";
-        if (char.ToLower(letter) == 'q') prefab += "Queen";
-        if (char.ToLower(letter) == 'k') prefab += "King";
+        switch (char.ToLower(letter))
+        {
+            case 'k': prefab += "King"; break;
+            case 'p': prefab += "Pawn"; break;
+            case 'n': prefab += "Knight"; break;
+            case 'b': prefab += "Bishop"; break;
+            case 'r': prefab += "Rook"; break;
+            default : prefab += "Queen"; break;
+        }
         GameObject piecePrefab = Resources.Load<GameObject>(prefab);
-        GameObject piece = Instantiate(piecePrefab,IDToWorld(cell),Quaternion.identity);
+        GameObject piece = Instantiate(piecePrefab,IDToWorld(cell,isFlipped)+pieces.transform.position,Quaternion.identity);
         piece.name = prefab;
         tiles[cell].piece = piece;
         piece.transform.parent = pieces.transform;
@@ -185,24 +226,6 @@ public class BoardUI : MonoBehaviour
             Destroy(child.gameObject);
         }
     }
-    private void CreateBoard()
-    {
-        tiles = new Tile[64];
-        for (int i=0;i<64;i++)
-        {
-            GameObject c = TileGrid.transform.GetChild(i).gameObject;
-            tiles[i] = CreateTile(c,i);
-        }
-    }
-    private Tile CreateTile(GameObject ob,int i) 
-    {
-        Tile t = new Tile();
-        t.cell = ob;
-        t.piece = null;
-        t.x = i % 8;
-        t.y = i / 8;
-        return t;
-    }
     public void ColorTiles()
     {
         this.transform.GetChild(2).GetComponent<SpriteRenderer>().color = backgroundColor;
@@ -217,7 +240,7 @@ public class BoardUI : MonoBehaviour
         }
         for (int i=0;i<8;i++)
         {
-            Color col = i % 2 == 0 ? color2 : color1;
+            Color col = (!isFlipped && i % 2 == 0) || (isFlipped && i % 2 == 1) ? color2 : color1;
             ranks[i].color = col;
             files[i].color = col;
         }
@@ -269,9 +292,10 @@ public class BoardUI : MonoBehaviour
         // x,y in (0-7)
         return new Vector3(x-3.5f,y-3.5f,0);
     }
-    public static Vector3 IDToWorld(int cellID)
+    public static Vector3 IDToWorld(int cellID, bool isFlipped)
     {
-        var (x, y) = ChessGame.IDToCell(cellID);
+        int visualIndex = isFlipped ? (63-cellID) : cellID; 
+        var (x, y) = ChessGame.IDToCell(visualIndex);
         return CellToWorld(x,y);
     }
     public static Vector2Int WorldToCell(Vector3 worldPos)

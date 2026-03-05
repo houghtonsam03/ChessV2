@@ -53,70 +53,58 @@ public class ChessGame : MonoBehaviour
             case Player1Side.Black : player1White = false; break;
             case Player1Side.Random : player1White = UnityEngine.Random.value < 0.5f; break;
         }
-        turnIndex = player1White ? 0 : 1;
+        turnIndex = 0;
         
         // Start agents
-        agents = new ChessAgent[2]{Agent1,Agent2};
+        agents = new ChessAgent[2];
+        agents[0] = player1White ? Agent1 : Agent2;
+        agents[1] = player1White ? Agent2 : Agent1;
         evals = new float?[2];
-        if (Agent1 == null) agents[0] = null;
-        else {agents[0] = Instantiate(Agent1); agents[0].StartAgent(player1White); evals[0] = agents[0].EvalPos(board);}
-        if (Agent2 == null) agents[1] = null;
-        else {agents[1] = Instantiate(Agent2); agents[1].StartAgent(!player1White); evals[1] = agents[1].EvalPos(board);}
+        if (agents[0] != null) {agents[0] = Instantiate(agents[0]); agents[0].StartAgent(true); evals[0] = agents[0].EvalPos(board);}
+        if (agents[1] != null) {agents[1] = Instantiate(agents[1]); agents[1].StartAgent(false); evals[1] = agents[1].EvalPos(board);}
 
         // Start Timers
         TimeLimit *= 60;
         whiteTimer = TimeLimit; blackTimer = TimeLimit;
         delayTime = 0f;
 
-        // Spawn BoardUI and PlayerListener if we want graphics
+        // Spawn UI if we want graphics
         if (Graphics || agents[0] == null || agents[1] == null)
         {
             UI = this.AddComponent<GameUI>();
-            float? whiteEval = player1White ? evals[0] : evals[1];
-            float? blackEval = player1White ? evals[1] : evals[0];
-            UI.Setup(this,board,player1White,agents,whiteEval,blackEval,TimeLimit);
+            UI.Setup(this,board,player1White,agents,evals,TimeLimit);
         }
         else MoveDelay = 0f;
     }
     void Update()
     {
         if (board == null) return;
-        if (!board.gameOver && delayTime >= MoveDelay)
+        if (!board.gameOver)
         {   
-            // Update graphics
-            float? whiteEval = player1White ? evals[0] : evals[1];
-            float? blackEval = player1White ? evals[1] : evals[0];
-            if (UI != null) UI.UpdateGraphics(whiteTimer,blackTimer,whiteEval,blackEval);
-
-            // Update timers
-            if (board.colourToMove == Piece.white) whiteTimer -= Time.deltaTime;
-            else if (board.colourToMove == Piece.black) blackTimer -= Time.deltaTime;
-            
+            // Check Gameover
             if (endState != 0)
             {
                 board.gameOver = true;
                 if (UI != null) UI.EndGame(endState,board.FindKing(Piece.white),board.FindKing(Piece.black));
                 return;
             }
-            // Ask Agent for move
-            ChessAgent agent = agents[turnIndex];
-            if (agent == null) // Human
+            // Main Game Loop
+            if (delayTime >= MoveDelay)
             {
-                // We wait for playerListener to make move.
-            }
-            else // AI Agent
-            {
-                // Main AI Loop
-                Move move = agent.GetMove(board);
-                MakeMove(move);
-                for (int i=0;i<2;i++)
+                // Update timers
+                if (board.colourToMove == Piece.white) whiteTimer -= Time.deltaTime;
+                else if (board.colourToMove == Piece.black) blackTimer -= Time.deltaTime;
+                
+                // Ask Agent for move
+                ChessAgent agent = agents[turnIndex];
+                if (agent != null) // Human
                 {
-                    if (agents[i] == null) continue;
-                    evals[i] = agents[i].EvalPos(board);
+                    Move move = agent.GetMove(board);
+                    MakeMove(move);
                 }
-                delayTime = 0f;
             }
         }
+        // Timer
         delayTime += Time.deltaTime;
     }
     public bool hasPiece(int cell,int moveColour=24,int pieceType=Piece.None)
@@ -148,16 +136,23 @@ public class ChessGame : MonoBehaviour
             board.MakeMove(move);
             bool isCheck = board.IsCheck(board.colourToMove);
             moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
+
             turnIndex ^= 1;
+            delayTime = 0f;
+
             endState = board.IsGameOver(whiteTimer,blackTimer);
             bool isCheckmate = endState != 0;
+            for (int i=0;i<2;i++)
+            {
+                if (agents[i] == null) continue;
+                evals[i] = agents[i].EvalPos(board);
+            }
             // Check for GameOver
             if (UI != null)
             {
                 UI.EndTurn(move,isWhite,isCapture,isCheck,isCheckmate);
-                delayTime = 0f;
+                UI.UpdateGraphics(whiteTimer,blackTimer,evals);
             }
-
         }
         // Debug Logic
         else
@@ -220,18 +215,14 @@ public class ChessGame : MonoBehaviour
         board.UndoMove();
         moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
         UpdateState();
-        float? whiteEval = player1White ? evals[0] : evals[1];
-        float? blackEval = player1White ? evals[1] : evals[0];
-        if (UI != null) UI.UpdateGraphics(whiteTimer,blackTimer,whiteEval,blackEval);
+        if (UI != null) UI.UpdateGraphics(whiteTimer,blackTimer,evals);
         moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
     }
     public void DebugBitboard()
     {
         n += 1;
         n %= 20;
-        float? whiteEval = player1White ? evals[0] : evals[1];
-        float? blackEval = player1White ? evals[1] : evals[0];
-        if (n == 0) UI.UpdateGraphics(whiteTimer,blackTimer,whiteEval,blackEval);
+        if (n == 0) UI.UpdateGraphics(whiteTimer,blackTimer,evals);
         else if (n <= 15) UI.DrawBitboard(board.bitboards[n-1]);
         else if (n == 16) UI.DrawBitboard(board.whiteAttacks);
         else if (n == 17) UI.DrawBitboard(board.blackAttacks);

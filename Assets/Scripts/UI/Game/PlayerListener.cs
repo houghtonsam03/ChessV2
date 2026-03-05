@@ -13,23 +13,25 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     private GameUI UI;
     private BoardUI board;
     // Selection Logic
+    private bool isFlipped;
     private int selectedID = -1;
     private bool[] isHuman = new bool[2];
     private int promotionCell = -1;
     private int turn;
     private int colour = Piece.white;
     private bool gameOver = false;
-    public void Setup(ChessGame g,BoardUI b,GameUI ui,bool p1White,ChessAgent[] agents)
+    public void Setup(ChessGame g,BoardUI b,GameUI ui,bool p1White,ChessAgent[] agents,bool flipped)
     {
         game = g;
         board = b;
         UI = ui;
-        turn = p1White ? 0 : 1;
-        isHuman[0] = agents[0] == null; isHuman[1] = agents[1] == null;
+        turn = 0;
+        isHuman[0] = agents[0] == null;
+        isHuman[1] = agents[1] == null;
+        isFlipped = flipped;
     }
     public void Update()
     {
-        if (Keyboard.current.spaceKey.wasPressedThisFrame) DrawBitboard();
         if (Keyboard.current.enterKey.wasPressedThisFrame) ResetScene();
     }
     public void OnPointerDown(PointerEventData eventData)
@@ -40,8 +42,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         }
         // This runs whenever mouse1 is pressed
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(eventData.position);
-        Vector2Int cell = BoardUI.WorldToCell(mousePos);
-        int cellID = ChessGame.CellToID(cell.x,cell.y);
+        int cellID = ClickedTile(mousePos);
         if (IsOOB(mousePos) && selectedID >= 0) UnSelect();
         else if (promotionCell >= 0)
         {
@@ -80,8 +81,7 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         if (selectedID < 0 || gameOver || promotionCell != -1) return;  // If: No piece selected , Gameover , Promotion pending.
 
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(eventData.position);
-        Vector2Int cell = BoardUI.WorldToCell(mousePos);
-        int cellID = ChessGame.CellToID(cell.x,cell.y);
+        int cellID = ClickedTile(mousePos);
 
         // If move is oob or no legal move -> reset the piece.
         if (IsOOB(mousePos)) board.ResetPiecePos(selectedID);
@@ -110,6 +110,13 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
             UnSelect();
         }
         else board.PieceFollowMousePos(selectedID,eventData.position);
+    }
+    private int ClickedTile(Vector3 mousePos)
+    {
+        if (IsOOB(mousePos)) return -1;
+        Vector2Int cell = BoardUI.WorldToCell(mousePos);
+        int cellID = ChessGame.CellToID(cell.x,cell.y);
+        return isFlipped ? 63 - cellID : cellID;
     }
     public void Select(int ID)
     {
@@ -145,8 +152,9 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     public bool IsPromotionMove(int targetID)
     {
         bool lastRank = ChessGame.GetRank(targetID) == (turn^1)*7;
-        return game.hasPiece(selectedID,colour,Piece.Pawn) && lastRank;
-    }
+        bool pawnMove = game.hasPiece(selectedID,colour,Piece.Pawn);
+        return pawnMove && lastRank;
+    } 
     public bool IsOOB(Vector3 pos)
     {
         Vector2Int cell = BoardUI.WorldToCell(pos);

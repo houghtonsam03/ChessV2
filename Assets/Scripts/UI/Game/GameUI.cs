@@ -12,7 +12,7 @@ public class GameUI : MonoBehaviour
     private RightUI rightUI;
     private Board board;
 
-    public void Setup(ChessGame g,Board b,bool p1White,ChessAgent[] agents,float? whiteEval,float? blackEval,float TimeLimit)
+    public void Setup(ChessGame g,Board b,bool p1White,ChessAgent[] agents,float?[] evals,float TimeLimit)
     {
         // Chess Game
         game = g;
@@ -25,11 +25,13 @@ public class GameUI : MonoBehaviour
         GameObject boardObject = Instantiate(prefab,prefab.transform.position,Quaternion.identity);
         boardObject.transform.parent = gameObject.transform;
         boardUI = boardObject.GetComponent<BoardUI>();
+        bool isFlipped = agents[0] != null && agents[1] == null;
+        boardUI.Setup(isFlipped);
         boardUI.readBoard(board);
 
         // Player Input Listener
         playerListener = boardUI.GetComponent<PlayerListener>();
-        playerListener.Setup(game,boardUI,this,p1White,agents);
+        playerListener.Setup(game,boardUI,this,p1White,agents,isFlipped);
 
         // Sound
         prefab = Resources.Load<GameObject>("Speaker");
@@ -44,7 +46,7 @@ public class GameUI : MonoBehaviour
         GameObject leftObject = Instantiate(prefab,prefab.transform.position,Quaternion.identity);
         leftObject.transform.SetParent(gameObject.transform);
         leftUI = leftObject.GetComponent<LeftUI>();
-        leftUI.Setup(TimeLimit,TimeLimit,whiteEval,blackEval);
+        leftUI.Setup(TimeLimit,TimeLimit,evals);
 
         // Right UI (Game History, New Game & Draw Offer/Resign)
         prefab = Resources.Load<GameObject>("RightUI");
@@ -54,10 +56,10 @@ public class GameUI : MonoBehaviour
         rightUI.Setup();
 
     }
-    public void UpdateGraphics(float whiteTime,float blackTime,float? whiteEval, float? blackEval)
+    public void UpdateGraphics(float whiteTime,float blackTime,float?[] evals)
     {
         leftUI.UpdateTimes(whiteTime,blackTime);
-        leftUI.UpdateEval(whiteEval,blackEval);
+        leftUI.UpdateEval(evals);
     }
     public void EndTurn(Move move,bool isWhite,bool isCapture,bool isCheck, bool isCheckmate)
     {
