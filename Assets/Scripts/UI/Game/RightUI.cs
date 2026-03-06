@@ -15,6 +15,11 @@ public class RightUI : MonoBehaviour
         historyScrollRect = this.gameObject.transform.Find("History").Find("Scroll View").GetComponent<ScrollRect>();
         moveNumber = 0;
     }
+    public void Clean()
+    {
+        historyText.text = "";
+        moveNumber = 0;
+    }
     public void UpdateHistory(string moveString, bool whiteToMove)
     {
         string s = "";

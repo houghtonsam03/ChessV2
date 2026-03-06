@@ -28,7 +28,9 @@ public class AgentComparer : MonoBehaviour
         // Start agents & game
         chessObject = new GameObject("Game");
         currentGame = chessObject.AddComponent<ChessGame>();
-        currentGame.Graphics = false; currentGame.Agent1 = Agent1; currentGame.Agent2 = Agent2; currentGame.TimeLimit = TimeLimit; currentGame.PlayerOneSide = ChessGame.Player1Side.Random;
+        bool p1White = UnityEngine.Random.value < 0.5f;
+        currentGame.Agent1 = Agent1; currentGame.Agent2 = Agent2;
+        currentGame.Begin(p1White,true,true,TimeLimit,false);
 
         // Get Elements
         bars = new LayoutElement[3];
@@ -49,10 +51,9 @@ public class AgentComparer : MonoBehaviour
             gameCount++;
             states[endState]++;
             UpdateBar(endState);
-            Destroy(currentGame);
-            currentGame = chessObject.AddComponent<ChessGame>();
-            currentGame.Graphics = false; currentGame.Agent1 = Agent1; currentGame.Agent2 = Agent2; currentGame.TimeLimit = TimeLimit;
-            ChessGame.PrintState(endState);
+            bool p1White = UnityEngine.Random.value < 0.5f;
+            currentGame.Rematch(p1White);
+            Debug.Log(ChessGame.StringState(endState));
         }
     }
     private void UpdateBar(int newState)

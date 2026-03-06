@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Unity.VisualScripting;
 using UnityEngine;
 using static ChessSound;
 
@@ -10,9 +11,10 @@ public class GameUI : MonoBehaviour
     private ChessSound sound;
     private LeftUI leftUI;
     private RightUI rightUI;
+    private GameoverMenu gameoverMenu;
     private Board board;
 
-    public void Setup(ChessGame g,Board b,bool p1White,ChessAgent[] agents,float?[] evals,float TimeLimit)
+    public void Setup(ChessGame g,Board b,bool player1White,ChessAgent[] agents,float?[] evals,float TimeLimit)
     {
         // Chess Game
         game = g;
@@ -31,7 +33,7 @@ public class GameUI : MonoBehaviour
 
         // Player Input Listener
         playerListener = boardUI.GetComponent<PlayerListener>();
-        playerListener.Setup(game,boardUI,this,p1White,agents,isFlipped);
+        playerListener.Setup(game,boardUI,this,agents,isFlipped);
 
         // Sound
         prefab = Resources.Load<GameObject>("Speaker");
@@ -47,6 +49,7 @@ public class GameUI : MonoBehaviour
         leftObject.transform.SetParent(gameObject.transform);
         leftUI = leftObject.GetComponent<LeftUI>();
         leftUI.Setup(TimeLimit,TimeLimit,evals);
+        if (isFlipped) leftUI.FlipUI();
 
         // Right UI (Game History, New Game & Draw Offer/Resign)
         prefab = Resources.Load<GameObject>("RightUI");
@@ -55,6 +58,32 @@ public class GameUI : MonoBehaviour
         rightUI = rightObject.GetComponent<RightUI>();
         rightUI.Setup();
 
+        // Gameover menu (inactive)
+        prefab = Resources.Load<GameObject>("GameoverMenu");
+        GameObject menuObject = Instantiate(prefab,prefab.transform.position,Quaternion.identity);
+        menuObject.transform.SetParent(gameObject.transform);
+        gameoverMenu = menuObject.GetComponent<GameoverMenu>();
+        gameoverMenu.Setup(this,game,player1White);
+
+    }
+    public void Rematch(Board b,ChessAgent[] agents,float?[] evals,float TimeLimit)
+    {
+        board.setPos(b);
+
+        bool isFlipped = agents[0] != null && agents[1] == null;
+        boardUI.Setup(isFlipped);
+        boardUI.readBoard(board);
+
+        playerListener.NewGame(agents,isFlipped);
+
+        sound.PlayStartSound();
+
+        leftUI.UpdateTimes(TimeLimit,TimeLimit);
+        leftUI.UpdateEval(evals);
+
+        rightUI.Clean();
+
+        gameoverMenu.Close();
     }
     public void UpdateGraphics(float whiteTime,float blackTime,float?[] evals)
     {
@@ -88,8 +117,8 @@ public class GameUI : MonoBehaviour
         if (state < 4) winner = 1;
         if (state > 6) winner = 0;
 
-        ChessGame.PrintState(state);
         boardUI.DrawGameOver(winner,whiteKingPos,blackKingPos);
+        gameoverMenu.Show(state);
         playerListener.EndGame();
         sound.PlayGameoverSound();
     }

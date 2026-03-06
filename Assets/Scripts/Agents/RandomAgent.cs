@@ -26,6 +26,6 @@ public class RandomAgent : ChessAgent
     }
     public override float? EvalPos(Board board)
     {
-        return UnityEngine.Random.Range(-20,20);
+        return null;
     }
 }

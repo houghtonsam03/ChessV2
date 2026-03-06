@@ -138,10 +138,15 @@ public class Board
             }
         }
         if (fenFields[3] != "-") enpassant = ChessGame.StringToID(fenFields[3]);
+        else enpassant = -1;
         halfmove = fenFields[4].ToCharArray()[0] -'0';
         fullmove = fenFields[5].ToCharArray()[0] -'0';
         zobristKey = Zobrist.ZobristHash(this);
-        positionHistory.Add(zobristKey);
+
+        positionHistory = new List<ulong>{zobristKey};
+
+        gameOver = false;
+        lastMoves = new List<LastMove>();
     }
     public void setPos(Board b)
     {
@@ -155,7 +160,14 @@ public class Board
         bitboards = new ulong[15];
         for (int i=0;i<15;i++) {bitboards[i] = b.bitboards[i];}
         zobristKey = Zobrist.ZobristHash(this);
-        positionHistory.Add(zobristKey);
+        positionHistory = new List<ulong>{zobristKey};
+
+        gameOver = false;
+        lastMoves = new List<LastMove>();
+        whiteAttacks = GetAttacks(Piece.white);
+        blackAttacks = GetAttacks(Piece.black);
+        whitePins = GetPins(Piece.white);
+        blackPins = GetPins(Piece.black);
     }
     public void MakeMove(Move move)
     {

@@ -55,7 +55,9 @@
     <Compile Include="Assets\Scripts\UI\Comparer\AgentComparer.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMP_TextSelector_A.cs" />
     <Compile Include="Assets\Scripts\Logic\Zobrist.cs" />
+    <Compile Include="Assets\Scripts\UI\Game\GameoverMenu.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\Benchmark02.cs" />
+    <Compile Include="Assets\Scripts\UI\Game\StartupMenu.cs" />
     <Compile Include="Assets\Scripts\UI\Game\PlayerListener.cs" />
     <Compile Include="Assets\Scripts\Logic\Piece.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMP_ExampleScript_01.cs" />

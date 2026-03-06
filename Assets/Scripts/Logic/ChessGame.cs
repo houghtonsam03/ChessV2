@@ -8,15 +8,10 @@ using UnityEngine.UI;
 
 public class ChessGame : MonoBehaviour
 {
-    public bool Graphics;
     public float MoveDelay;
     public ChessAgent Agent1;
     public ChessAgent Agent2;
-    public enum Player1Side {White,Black,Random};
-    public Player1Side PlayerOneSide;
-    public float TimeLimit;
     
-
     // System variables
     private bool player1White;
     private ChessAgent[] agents;
@@ -24,6 +19,7 @@ public class ChessGame : MonoBehaviour
     private GameUI UI;
 
     // Timer variables;
+    private float timeLimit;
     private float whiteTimer;
     private float blackTimer;
     private float delayTime;
@@ -38,7 +34,7 @@ public class ChessGame : MonoBehaviour
     // Debugging variables
     private int n;
     
-    void Start()
+    public void Begin(bool p1White,bool player1AI,bool player2AI,float timeSeconds,bool graphics)
     {
         // Initial gameState
         gameFen = Board.startingFen;
@@ -47,41 +43,84 @@ public class ChessGame : MonoBehaviour
         moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
 
         // Set Side
-        switch (PlayerOneSide)
-        {
-            case Player1Side.White : player1White = true; break;
-            case Player1Side.Black : player1White = false; break;
-            case Player1Side.Random : player1White = UnityEngine.Random.value < 0.5f; break;
-        }
+        player1White = p1White;
         turnIndex = 0;
         
         // Start agents
         agents = new ChessAgent[2];
-        agents[0] = player1White ? Agent1 : Agent2;
-        agents[1] = player1White ? Agent2 : Agent1;
         evals = new float?[2];
-        if (agents[0] != null) {agents[0] = Instantiate(agents[0]); agents[0].StartAgent(true); evals[0] = agents[0].EvalPos(board);}
-        if (agents[1] != null) {agents[1] = Instantiate(agents[1]); agents[1].StartAgent(false); evals[1] = agents[1].EvalPos(board);}
+        bool whiteAI = (p1White && player1AI) || (!p1White && player2AI);
+        bool blackAI = (p1White && player2AI) || (!p1White && player1AI);
+        if (whiteAI)
+        {
+            agents[0] = player1White ? Agent1 : Agent2;
+            agents[0] = Instantiate(agents[0]);
+            agents[0].StartAgent(true);
+            evals[0] = agents[0].EvalPos(board);
+        }
+        if (blackAI)
+        {
+            agents[1] = player1White ? Agent2 : Agent1;
+            agents[1] = Instantiate(agents[1]);
+            agents[1].StartAgent(false);
+            evals[1] = agents[1].EvalPos(board);
+        }
 
         // Start Timers
-        TimeLimit *= 60;
-        whiteTimer = TimeLimit; blackTimer = TimeLimit;
+        timeLimit = timeSeconds;
+        whiteTimer = timeLimit; blackTimer = timeLimit;
         delayTime = 0f;
 
         // Spawn UI if we want graphics
-        if (Graphics || agents[0] == null || agents[1] == null)
+        if (graphics || agents[0] == null || agents[1] == null)
         {
             UI = this.AddComponent<GameUI>();
-            UI.Setup(this,board,player1White,agents,evals,TimeLimit);
+            UI.Setup(this,board,player1White,agents,evals,timeLimit);
         }
         else MoveDelay = 0f;
+    }
+    public void Rematch(bool p1White)
+    {
+        gameFen = Board.startingFen;
+        board.setPos(gameFen);
+        moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
+
+        player1White = p1White;
+        turnIndex = 0;
+        endState = 0;
+
+        evals = new float?[2];
+
+        if (agents[0] != null)
+        {
+            agents[0] = player1White ? Agent1 : Agent2;
+            agents[0] = Instantiate(agents[0]);
+            agents[0].StartAgent(true);
+            evals[0] = agents[0].EvalPos(board);
+        }
+        if (agents[1] != null)
+        {
+            agents[1] = player1White ? Agent2 : Agent1;
+            agents[1] = Instantiate(agents[1]);
+            agents[1].StartAgent(false);
+            evals[1] = agents[1].EvalPos(board);
+        }
+
+        whiteTimer = timeLimit; blackTimer = timeLimit;
+        delayTime = 0f;
+        if (UI != null) UI.Rematch(board,agents,evals,timeLimit);
     }
     void Update()
     {
         if (board == null) return;
         if (!board.gameOver)
         {   
+            if (UI != null)
+            {
+                UI.UpdateGraphics(whiteTimer,blackTimer,evals);
+            }
             // Check Gameover
+            if (whiteTimer < 0 || blackTimer < 0) endState = board.IsGameOver(whiteTimer,blackTimer); // Check timeout
             if (endState != 0)
             {
                 board.gameOver = true;
@@ -260,21 +299,25 @@ public class ChessGame : MonoBehaviour
         int x = square.ToCharArray()[1]-'0';
         return CellToID(x,y);
     }
-    public static void PrintState(int state)
+    public static string StringState(int state)
     {
-        string endstate = "Not Gameover";
-        if (state == 1) endstate = "White Win | Checkmate";
-        if (state == 2) endstate = "White Win | Resign";
-        if (state == 3) endstate = "White Win | Timeout";
-        if (state == 4) endstate = "Black Win | Checkmate";
-        if (state == 5) endstate = "Black Win | Resign";
-        if (state == 6) endstate = "Black Win | Timeout";
-        if (state == 7) endstate = "Draw | Stalemate";
-        if (state == 8) endstate = "Draw | Insufficient Material";
-        if (state == 9) endstate = "Draw | Fify-Move-Rule";
-        if (state == 10) endstate = "Draw | Threefold Repetition";
-        if (state == 11) endstate = "Draw | Agreement";
-        if (state == 12) endstate = "Draw | Timeout";
-        Debug.Log(endstate);
+        string endstate;
+        switch (state)
+        {
+            case 1: endstate = "White Win - Checkmate"; break;
+            case 2: endstate = "White Win - Resign"; break;
+            case 3: endstate = "White Win - Timeout"; break;
+            case 4: endstate = "Black Win - Checkmate"; break;
+            case 5: endstate = "Black Win - Resign"; break;
+            case 6: endstate = "Black Win - Timeout"; break;
+            case 7: endstate = "Draw - Stalemate"; break;
+            case 8: endstate = "Draw - Insufficient Material"; break;
+            case 9: endstate = "Draw | Fify-Move-Rule"; break;
+            case 10: endstate = "Draw - Threefold Repetition"; break;
+            case 11: endstate = "Draw - Agreement"; break;
+            case 12: endstate = "Draw - Timeout & Insuff. Material"; break;
+            default: endstate = "Not Gameover"; break;
+        }
+        return endstate;
     }
 }

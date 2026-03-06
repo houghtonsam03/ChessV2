@@ -15,12 +15,12 @@ public class LeftUI : MonoBehaviour
     private TextMeshProUGUI blackEvalText;
     public void Setup(float whiteTime, float blackTime,float?[] evals)
     {
-        whiteTimerText = this.gameObject.transform.Find("WhiteTimer").Find("WhiteTimerText").GetComponent<TextMeshProUGUI>();
-        blackTimerText = this.gameObject.transform.Find("BlackTimer").Find("BlackTimerText").GetComponent<TextMeshProUGUI>();
-        whiteEvalObject = this.gameObject.transform.Find("WhiteEval").transform.gameObject;
-        blackEvalObject = this.gameObject.transform.Find("BlackEval").transform.gameObject;
-        whiteEvalText = this.gameObject.transform.Find("WhiteText").GetComponent<TextMeshProUGUI>();
-        blackEvalText = this.gameObject.transform.Find("BlackText").GetComponent<TextMeshProUGUI>();
+        whiteTimerText = this.gameObject.transform.Find("White").Find("Timer").Find("Time").GetComponent<TextMeshProUGUI>();
+        blackTimerText = this.gameObject.transform.Find("Black").Find("Timer").Find("Time").GetComponent<TextMeshProUGUI>();
+        whiteEvalObject = this.gameObject.transform.Find("White").Find("Eval").transform.gameObject;
+        blackEvalObject = this.gameObject.transform.Find("Black").Find("Eval").transform.gameObject;
+        whiteEvalText = this.gameObject.transform.Find("White").Find("Text").GetComponent<TextMeshProUGUI>();
+        blackEvalText = this.gameObject.transform.Find("Black").Find("Text").GetComponent<TextMeshProUGUI>();
         UpdateTimes(whiteTime,blackTime);
         UpdateEval(evals);
     }
@@ -28,6 +28,14 @@ public class LeftUI : MonoBehaviour
     {
         whiteTimerText.text = ReformatTime(whiteTime);
         blackTimerText.text = ReformatTime(blackTime);
+    }
+    public void FlipUI()
+    {
+        this.gameObject.transform.Find("White").gameObject.transform.position += Vector3.up*6;
+        this.gameObject.transform.Find("White").Find("Timer").transform.position += Vector3.down*4.8f;
+
+        this.gameObject.transform.Find("Black").gameObject.transform.position += Vector3.down*6;
+        this.gameObject.transform.Find("Black").Find("Timer").transform.position += Vector3.up*4.8f;
     }
     public void UpdateEval(float?[] evals)
     {

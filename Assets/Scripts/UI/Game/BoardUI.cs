@@ -49,6 +49,7 @@ public class BoardUI : MonoBehaviour
     }
     public void Setup(bool flipped)
     {
+        CleanBoard();
         isFlipped = flipped;
         for (int x=0;x<8;x++)
         {
@@ -98,7 +99,7 @@ public class BoardUI : MonoBehaviour
     }
     public void setState(string state)
     {
-        CleanBoard();
+        CleanPieces();
         string pos = state.Split(" ")[0];
         string[] rows = pos.Split("/");
         int x, y = 7;
@@ -122,7 +123,7 @@ public class BoardUI : MonoBehaviour
     }
     public void readBoard(Board b)
     {
-        CleanBoard();
+        CleanPieces();
         char[] letters = new char[]{'K','P','N','B','R','Q','k','p','n','b','r','q'};
         for (int i=0;i<12;i++)
         {
@@ -216,6 +217,18 @@ public class BoardUI : MonoBehaviour
 
     }
     private void CleanBoard()
+    {
+        tiles = new Tile[64];
+        foreach (Transform child in TileGrid.transform)
+        {
+            Destroy(child.gameObject);
+        }
+        foreach (Transform child in pieces.transform)
+        {
+            Destroy(child.gameObject);
+        }
+    }
+    private void CleanPieces()
     {
         for (int i=0;i<tiles.Length;i++)
         {
