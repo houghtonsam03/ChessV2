@@ -1,4 +1,4 @@
-public static class Piece
+public readonly struct Piece
 {
     public const int None = 0;
     public const int King = 1;

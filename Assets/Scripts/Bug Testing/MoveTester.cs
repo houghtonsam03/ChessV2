@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using TMPro;
 using UnityEngine;
@@ -10,31 +11,39 @@ public class MoveTester : MonoBehaviour
     public string testFen;
     private int n = 1;
     private Board board;
+    private Stopwatch sw;    
     void Start()
     {
         if (testFen == "") testFen = Board.startingFen;
         board = new Board();
         board.setPos(testFen);
+        sw = new Stopwatch();
     }
     void Update()
     {
         if (Keyboard.current.spaceKey.wasPressedThisFrame) 
         {
-            float timeStart = Time.realtimeSinceStartup;
+            long start = Stopwatch.GetTimestamp();
             long nodes = Perft(board,n);
-            this.transform.Find("TextFrame").Find("Text").GetComponent<TextMeshProUGUI>().text += $"Perft({n}) = {nodes} ( {Time.realtimeSinceStartup-timeStart} sec)\n";
+            long total = Stopwatch.GetTimestamp()-start;
+            double freq = (double)Stopwatch.Frequency;
+
+            double totSec = total/freq;
+            this.transform.Find("TextFrame").Find("Text").GetComponent<TextMeshProUGUI>().text += $"Perft({n}) = {nodes} | Total: {totSec}sec\n";
             n++;
         }
     }
-    public static long Perft(Board board,int depth)
+    public long Perft(Board board,int depth)
     {
+        Span<Move> moveStorage = stackalloc Move[256];
+        int totalMoves = MoveGenerator.GenerateMoves(board,board.colourToMove,moveStorage);
 
-        List<Move> moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
-        if (depth == 1) return moves.Count;
+        if (depth == 1) return totalMoves;
+
         long nodes = 0;
-        for (int i=0;i<moves.Count;i++)
+        for (int i=0;i<totalMoves;i++)
         {
-            board.MakeMove(moves[i]);
+            board.MakeMove(moveStorage[i]);
             nodes += Perft(board,depth-1);
             board.UndoMove();
         }

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Unity.Collections;
+using Unity.Mathematics;
 using Unity.VisualScripting;
 using UnityEditor.ShaderGraph.Internal;
 using UnityEngine;
@@ -17,6 +19,7 @@ public class ChessGame : MonoBehaviour
     private ChessAgent[] agents;
     private float?[] evals;
     private GameUI UI;
+    private bool isAgentThinking;
 
     // Timer variables;
     private float timeLimit;
@@ -26,10 +29,10 @@ public class ChessGame : MonoBehaviour
 
     // Chess variables
     private string gameFen;
-    private List<Move> moves;
     private Board board;
     private int endState;
     private int turnIndex;
+
 
     // Debugging variables
     private int n;
@@ -40,11 +43,11 @@ public class ChessGame : MonoBehaviour
         gameFen = Board.startingFen;
         board = new Board();
         board.setPos(gameFen);
-        moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
 
         // Set Side
         player1White = p1White;
         turnIndex = 0;
+        isAgentThinking = false;
         
         // Start agents
         agents = new ChessAgent[2];
@@ -56,14 +59,14 @@ public class ChessGame : MonoBehaviour
             agents[0] = player1White ? Agent1 : Agent2;
             agents[0] = Instantiate(agents[0]);
             agents[0].StartAgent(true);
-            evals[0] = agents[0].EvalPos(board);
+            GetAIEval(0);
         }
         if (blackAI)
         {
             agents[1] = player1White ? Agent2 : Agent1;
             agents[1] = Instantiate(agents[1]);
             agents[1].StartAgent(false);
-            evals[1] = agents[1].EvalPos(board);
+            GetAIEval(1);
         }
 
         // Start Timers
@@ -83,11 +86,11 @@ public class ChessGame : MonoBehaviour
     {
         gameFen = Board.startingFen;
         board.setPos(gameFen);
-        moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
 
         player1White = p1White;
         turnIndex = 0;
         endState = 0;
+        isAgentThinking = false;
 
         evals = new float?[2];
 
@@ -96,14 +99,14 @@ public class ChessGame : MonoBehaviour
             agents[0] = player1White ? Agent1 : Agent2;
             agents[0] = Instantiate(agents[0]);
             agents[0].StartAgent(true);
-            evals[0] = agents[0].EvalPos(board);
+            GetAIEval(0);
         }
         if (agents[1] != null)
         {
             agents[1] = player1White ? Agent2 : Agent1;
             agents[1] = Instantiate(agents[1]);
             agents[1].StartAgent(false);
-            evals[1] = agents[1].EvalPos(board);
+            GetAIEval(1);
         }
 
         whiteTimer = timeLimit; blackTimer = timeLimit;
@@ -112,39 +115,57 @@ public class ChessGame : MonoBehaviour
     }
     void Update()
     {
-        if (board == null) return;
-        if (!board.gameOver)
-        {   
-            if (UI != null)
+        if (board == null || board.gameOver) return;
+        // Update graphics
+        if (UI != null) UI.UpdateGraphics(whiteTimer,blackTimer,evals);
+        // Check Gameover
+        if (whiteTimer < 0 || blackTimer < 0) endState = board.IsGameOver(whiteTimer,blackTimer); // Check timeout
+        if (endState != 0)
+        {
+            board.gameOver = true;
+            if (UI != null) UI.EndGame(endState,board.FindKing(Piece.white),board.FindKing(Piece.black));
+            return;
+        }
+        // Main Game Loop
+        if (delayTime >= MoveDelay)
+        {
+            // Update timers
+            if (board.colourToMove == Piece.white) whiteTimer -= Time.deltaTime;
+            else if (board.colourToMove == Piece.black) blackTimer -= Time.deltaTime;
+
+            // Ask Agent for move
+            if (!isAgentThinking)
             {
-                UI.UpdateGraphics(whiteTimer,blackTimer,evals);
-            }
-            // Check Gameover
-            if (whiteTimer < 0 || blackTimer < 0) endState = board.IsGameOver(whiteTimer,blackTimer); // Check timeout
-            if (endState != 0)
-            {
-                board.gameOver = true;
-                if (UI != null) UI.EndGame(endState,board.FindKing(Piece.white),board.FindKing(Piece.black));
-                return;
-            }
-            // Main Game Loop
-            if (delayTime >= MoveDelay)
-            {
-                // Update timers
-                if (board.colourToMove == Piece.white) whiteTimer -= Time.deltaTime;
-                else if (board.colourToMove == Piece.black) blackTimer -= Time.deltaTime;
-                
-                // Ask Agent for move
-                ChessAgent agent = agents[turnIndex];
-                if (agent != null) // Human
+                if (agents[turnIndex] != null)
                 {
-                    Move move = agent.GetMove(board);
-                    MakeMove(move);
-                }
+                    GetAIMove(turnIndex);
+                }   
             }
         }
         // Timer
         delayTime += Time.deltaTime;
+    }
+    async void GetAIMove(int agentIndex)
+    {
+        ChessAgent agent = agents[agentIndex];
+        isAgentThinking = true;
+
+        Board boardCopy = new Board(); 
+        boardCopy.setPos(board);
+
+        Move move = await Task.Run(() => {System.Threading.Thread.CurrentThread.Priority = System.Threading.ThreadPriority.Highest;return agent.GetMove(boardCopy);});
+        MakeMove(move);
+
+        isAgentThinking = false;
+    }
+    async void GetAIEval(int agentIndex)
+    {
+        ChessAgent agent = agents[agentIndex];
+
+        Board boardCopy = new Board(); 
+        boardCopy.setPos(board);
+
+        evals[agentIndex] = await Task.Run(() => {System.Threading.Thread.CurrentThread.Priority = System.Threading.ThreadPriority.AboveNormal;return agent.GetEval(boardCopy);});
     }
     public bool hasPiece(int cell,int moveColour=24,int pieceType=Piece.None)
     {
@@ -171,10 +192,9 @@ public class ChessGame : MonoBehaviour
 
             // Update Engine
             bool isWhite = board.colourToMove == Piece.white;
-            bool isCapture = move.enpassant || Bitboard.HasBit(board.bitboards[14],move.TargetSquare);
+            bool isCapture = move.IsEnPassant() || Bitboard.HasBit(board.bitboards[14],move.To);
             board.MakeMove(move);
             bool isCheck = board.IsCheck(board.colourToMove);
-            moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
 
             turnIndex ^= 1;
             delayTime = 0f;
@@ -184,7 +204,7 @@ public class ChessGame : MonoBehaviour
             for (int i=0;i<2;i++)
             {
                 if (agents[i] == null) continue;
-                evals[i] = agents[i].EvalPos(board);
+                GetAIEval(i);
             }
             // Check for GameOver
             if (UI != null)
@@ -199,33 +219,61 @@ public class ChessGame : MonoBehaviour
             string s = "";
             if (board.colourToMove == 8) s += "white";
             else s+= "black";
-            Debug.Log($"Illegal move by {s} player.");
+            Debug.Log($"Illegal move {move} by {s} player.");
         }
     }
     public Move GetMove(int start, int target,int promotionPiece=0)
     {
         // Returns the move from the moves list that is equal to mv
-        foreach (Move move in moves)
+        Span<Move> moves = stackalloc Move[256];
+        int moveCount = MoveGenerator.GenerateMoves(board,board.colourToMove,moves);
+        for(int i=0;i<moveCount;i++)
         {
-            Move mv = new Move(start,target,promotionPiece);
-            if (move == mv) return move;
+            Move move = moves[i];
+            if (move.From == start && move.To == target)
+            {
+                if (move.IsPromotion())
+                {
+                    if (move.GetPromotionPiece() == promotionPiece) return move;
+                    else continue;
+                }
+                return move;
+            }
         }
-        return null;
+        return Move.NullMove;
     }
     public bool IsLegalMove(Move move)
     {
-        return moves.Contains(move);
+        Span<Move> moves = stackalloc Move[256];
+        int moveCount = MoveGenerator.GenerateMoves(board,board.colourToMove,moves);
+        for(int i=0;i<moveCount;i++)
+        {
+            Move mv = moves[i];
+            if (move == mv) return true;
+        }
+        return false;
     }
     public bool IsLegalMove(int start, int target, int promotionPiece)
     {
-        return moves.Contains(new Move(start,target,promotionPiece));
+        Span<Move> moves = stackalloc Move[256];
+        int moveCount = MoveGenerator.GenerateMoves(board,board.colourToMove,moves);
+        for(int i=0;i<moveCount;i++)
+        {
+            Move move = moves[i];
+            Move mv = new Move(start,target,Move.GetPromotionFlag(promotionPiece));
+            if (move == mv) return true;
+        }
+        return false;
     }
     public bool HasLegalMove(int start, int target)
     {
-        foreach (Move move in moves)
+        Span<Move> moves = stackalloc Move[256];
+        int moveCount = MoveGenerator.GenerateMoves(board,board.colourToMove,moves);
+        for(int i=0;i<moveCount;i++)
         {
+            Move move = moves[i];
             Move mv = new Move(start,target);
-            if (move.StartSquare == mv.StartSquare && move.TargetSquare == mv.TargetSquare) return true;
+            if (move.From == mv.From && move.To == mv.To) return true;
         }
         return false;
     }
@@ -236,9 +284,12 @@ public class ChessGame : MonoBehaviour
     public List<Move> GetLegalMoves(int start)
     {
         List<Move> legalMoves = new List<Move>();
-        foreach (Move move in moves)
+        Span<Move> moves = stackalloc Move[256];
+        int moveCount = MoveGenerator.GenerateMoves(board,board.colourToMove,moves);
+        for(int i=0;i<moveCount;i++)
         {
-            if (move.StartSquare == start) legalMoves.Add(move);
+            Move move = moves[i];
+            if (move.From == start) legalMoves.Add(move);
         }
         return legalMoves;
     } 
@@ -250,23 +301,16 @@ public class ChessGame : MonoBehaviour
     {
         // Debugging for undoing two moves
         board.UndoMove();
-        moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
         board.UndoMove();
-        moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
         UpdateState();
         if (UI != null) UI.UpdateGraphics(whiteTimer,blackTimer,evals);
-        moves = MoveGenerator.GenerateMoves(board,board.colourToMove);
     }
     public void DebugBitboard()
     {
         n += 1;
-        n %= 20;
+        n %= 16;
         if (n == 0) UI.UpdateGraphics(whiteTimer,blackTimer,evals);
         else if (n <= 15) UI.DrawBitboard(board.bitboards[n-1]);
-        else if (n == 16) UI.DrawBitboard(board.whiteAttacks);
-        else if (n == 17) UI.DrawBitboard(board.blackAttacks);
-        else if (n == 18) UI.DrawBitboard(board.whitePins);
-        else if (n == 19) UI.DrawBitboard(board.blackPins);
     }
     public static int GetRank(int startSquare)
     {

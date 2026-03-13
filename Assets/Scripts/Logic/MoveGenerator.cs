@@ -5,13 +5,16 @@ using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
 using NUnit.Framework;
 using Unity.Burst.CompilerServices;
+using Unity.Profiling;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Analytics;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.Timeline;
 using UnityEngine.UI;
 using Debug = UnityEngine.Debug;
+
 public static class MoveGenerator
 {
     // Helpful constants
@@ -136,17 +139,18 @@ public static class MoveGenerator
         }
         return blockerPatterns;
     }
-    public static List<Move> GenerateMoves(Board board,int colour, int type=Piece.None)
-    {
-        List<Move> allMoves = GeneratePseudoLegalMoves(board,colour,type);
-        SolvePseudoMoves(board,allMoves);
-        return allMoves;
     
-    }
-    public static List<Move> GeneratePseudoLegalMoves(Board board,int colour, int type=Piece.None)
+    public static int GenerateMoves(Board board,int colour,Span<Move> moves, int type=Piece.None)
     {
-        List<Move> moves = new List<Move>();
+        int count = GeneratePseudoLegalMoves(board,colour,moves,type);
+        count = SolvePseudoMoves(board,moves,ref count);
+        return count;
+    }
+    public static int GeneratePseudoLegalMoves(Board board,int colour,Span<Move> moves, int type=Piece.None)
+    {
+        int count = 0;
         int offset = Piece.IsColour(colour,Piece.white) ? 0 : 6;
+
         if (type==Piece.None)
         {
             for (int i=0;i<6;i++)
@@ -155,7 +159,7 @@ public static class MoveGenerator
                 while (bitboard != 0)
                 {
                     int start = Bitboard.PopLowestBit(ref bitboard);
-                    GenerateMove(board,moves,start,colour,i+1,true);
+                    GenerateMove(board,moves,ref count,start,colour,i+1,true);
                 }
             }  
         }
@@ -166,31 +170,31 @@ public static class MoveGenerator
             while (bitboard != 0)
             {
                 int start = Bitboard.PopLowestBit(ref bitboard);
-                GenerateMove(board,moves,start,colour,type,true);
+                GenerateMove(board,moves,ref count,start,colour,type,true);
             }
         }
-        return moves;
+        return count;
     }
-    public static void GenerateMove(Board board,List<Move> moves,int start,int colour,int type,bool includeCastling = true)
+    public static void GenerateMove(Board board,Span<Move> moves,ref int count,int start,int colour,int type,bool includeCastling = true)
     {
         if (Piece.IsSlidingPiece(type))
         {
-            GenerateSlidingMoves(board,moves,start,colour,type);
+            GenerateSlidingMoves(board,moves,ref count,start,colour,type);
         }
         else if (Piece.IsType(type,Piece.King))
         {
-            GenerateKingMoves(board,moves,start,colour,includeCastling);
+            GenerateKingMoves(board,moves,ref count,start,colour,includeCastling);
         }
         else if (Piece.IsType(type,Piece.Pawn))
         {
-            GeneratePawnMoves(board,moves,start,colour);
+            GeneratePawnMoves(board,moves,ref count,start,colour);
         }
         else if (Piece.IsType(type,Piece.Knight))
         {
-            GenerateKnightMoves(board,moves,start,colour);
+            GenerateKnightMoves(board,moves,ref count,start,colour);
         }
     }
-    public static void GenerateSlidingMoves(Board board,List<Move> moves,int startCell, int colour,int type)
+    public static void GenerateSlidingMoves(Board board,Span<Move> moves,ref int count,int startCell, int colour,int type)
     {
         bool white = Piece.IsColour(colour,Piece.white);
         ulong friendlyPices = white ? board.bitboards[12] : board.bitboards[13];
@@ -225,22 +229,20 @@ public static class MoveGenerator
         while (movesMask != 0)
         {
             int target = Bitboard.PopLowestBit(ref movesMask);
-            moves.Add(new Move(startCell,target));
+            moves[count++] = new Move(startCell,target);
         }
     }
-    public static void GenerateKingMoves(Board board,List<Move> moves,int startCell,int colour,bool includeCastling)
+    public static void GenerateKingMoves(Board board,Span<Move> moves,ref int count,int startCell,int colour,bool includeCastling)
     {
         bool white = Piece.IsColour(colour,Piece.white);
         int teamMask = white ? 12 : 13;
-        ulong attacking = white ? board.blackAttacks : board.whiteAttacks;
 
         ulong moveBoard = KingAttacks[startCell];
         moveBoard &= ~board.bitboards[teamMask]; // Can't capture friendlies
-        moveBoard &= ~attacking; // Can't put King in check
         while (moveBoard != 0)
         {
             int target = Bitboard.PopLowestBit(ref moveBoard);
-            moves.Add(new Move(startCell,target));
+            moves[count++] = new Move(startCell,target);
         }
 
         if (!includeCastling) return;
@@ -250,15 +252,35 @@ public static class MoveGenerator
         int teamShift = white ? 0 : 7;
         // If castling is allowed and squares between are and not under attack clear we can castle.
         // Kingside
-        if (board.castling[0+teamOffset] && ((attacking & (Bitboard.kingsideCastle << teamShift*8)) == 0) && (board.bitboards[14] & (Bitboard.kingsideCastle << teamShift*8)) == 0) moves.Add(new Move(startCell,ChessGame.CellToID(6,teamShift),0,true));
+        if (board.castling[0+teamOffset] && (board.bitboards[14] & (Bitboard.kingsideCastle << teamShift*8)) == 0) 
+        {
+            bool isAttacked = false;
+            ulong moveMask = Bitboard.kingsideCastle << teamShift*8;
+            while (moveMask != 0)
+                {
+                    int sq = Bitboard.PopLowestBit(ref moveMask);
+                    if (board.IsAttacked(sq,Piece.GetOpponentColour(colour))) {isAttacked = true;break;}
+                }
+            if (!isAttacked) moves[count++] = new Move(startCell,ChessGame.CellToID(6,teamShift),MoveFlags.Castling);
+        }
         // Queenside
-        if (board.castling[1+teamOffset] && ((attacking & (Bitboard.queensideCastle << teamShift*8)) == 0) && (board.bitboards[14] & ((Bitboard.queensideCastle | 0x2) << teamShift*8)) == 0) moves.Add(new Move(startCell,ChessGame.CellToID(2,teamShift),0,true));
+        if (board.castling[1+teamOffset] && (board.bitboards[14] & ((Bitboard.queensideCastle | 0x2) << teamShift*8)) == 0)
+        {
+            bool isAttacked = false;
+            ulong moveMask = Bitboard.queensideCastle << teamShift*8;
+            while (moveMask != 0)
+            {
+                int sq = Bitboard.PopLowestBit(ref moveMask);
+                if (board.IsAttacked(sq,Piece.GetOpponentColour(colour))) {isAttacked = true;break;}
+            }
+        if (!isAttacked) moves[count++] = new Move(startCell,ChessGame.CellToID(2,teamShift),MoveFlags.Castling);
+        }
     }
-    public static void GeneratePawnMoves(Board board,List<Move> moves,int startCell, int colour)
+    public static void GeneratePawnMoves(Board board,Span<Move> moves,ref int count,int startCell, int colour)
     {
         bool white = Piece.IsColour(colour,Piece.white);
         // Check diagonal capture and En Passant
-        int team = (colour/8)-1;
+        int team = white ? 0 : 1;
         int firstRank = white ? 1: 6;
         int lastRank = white ? 7 : 0;
         int enemyMask = white ? 13 : 12;
@@ -270,36 +292,36 @@ public static class MoveGenerator
         while (attackSquares != 0)
         {
             int target = Bitboard.PopLowestBit(ref attackSquares);
-            if (ChessGame.GetRank(target) == lastRank) AddPromotionMoves(moves,startCell,target);
-            else moves.Add(new Move(startCell,target));
+            if (ChessGame.GetRank(target) == lastRank) AddPromotionMoves(moves,ref count,startCell,target);
+            else moves[count++] = new Move(startCell,target);
         }
         // En Passant
         if (board.enpassant >= 0)
         {
-            if (Bitboard.HasBit(PawnAttacks[startCell*2+team],board.enpassant)) moves.Add(new Move(startCell,board.enpassant,0,false,true));
+            if (Bitboard.HasBit(PawnAttacks[startCell*2+team],board.enpassant)) moves[count++] = new Move(startCell,board.enpassant,MoveFlags.EnPassant);
         }
 
         // Check pawn move 1 step.
         int targetCell = startCell + DirectionOffset[team];
         if (Bitboard.HasBit(board.bitboards[14],targetCell)) return;
-        if (ChessGame.GetRank(targetCell) == lastRank) AddPromotionMoves(moves,startCell,targetCell);
-        else moves.Add(new Move(startCell,targetCell));
+        if (ChessGame.GetRank(targetCell) == lastRank) AddPromotionMoves(moves,ref count,startCell,targetCell);
+        else moves[count++] = new Move(startCell,targetCell);
 
         // Check pawn move 2 step.
         if (ChessGame.GetRank(startCell) == firstRank)
         {
             targetCell = startCell + DirectionOffset[team] * 2;
-            if (!Bitboard.HasBit(board.bitboards[14],targetCell)) moves.Add(new Move(startCell,targetCell));
-        } 
+            if (!Bitboard.HasBit(board.bitboards[14],targetCell)) moves[count++] = new Move(startCell,targetCell);
+        }
     }
-    private static void AddPromotionMoves(List<Move> moves, int start, int target)
+    private static void AddPromotionMoves(Span<Move> moves,ref int count,int start, int target)
     {
-        moves.Add(new Move(start, target, Piece.Queen));
-        moves.Add(new Move(start, target, Piece.Rook));
-        moves.Add(new Move(start, target, Piece.Knight));
-        moves.Add(new Move(start, target, Piece.Bishop));
+        moves[count++] = new Move(start, target, MoveFlags.KnightPromotion);
+        moves[count++] = new Move(start, target, MoveFlags.BishopPromotion);
+        moves[count++] = new Move(start, target, MoveFlags.RookPromotion);
+        moves[count++] = new Move(start, target, MoveFlags.QueenPromotion);
     }
-    public static void GenerateKnightMoves(Board board,List<Move> moves,int startCell,int colour)
+    public static void GenerateKnightMoves(Board board,Span<Move> moves,ref int count,int startCell,int colour)
     {
         int teamMask = Piece.IsColour(colour,Piece.white) ? 12 : 13;
         ulong moveBoard = KnightAttacks[startCell];
@@ -307,47 +329,18 @@ public static class MoveGenerator
         while (moveBoard != 0)
         {
             int target = Bitboard.PopLowestBit(ref moveBoard);
-            moves.Add(new Move(startCell,target));
+            moves[count++] = new Move(startCell,target);
         }
     }
-    public static void SolvePseudoMoves(Board board,List<Move> moves)
+    public static int SolvePseudoMoves(Board board,Span<Move> moves,ref int count)
     {
-        for(int i = moves.Count-1;i >= 0;i--)
+        int validCount = 0;
+        for(int i = 0; i < count;i++)
         {
             board.MakeMove(moves[i]);
-            if (board.IsCheck(Piece.GetOpponentColour(board.colourToMove))) moves.RemoveAt(i);
+            if (!board.IsCheck(Piece.GetOpponentColour(board.colourToMove))) moves[validCount++] = moves[i];
             board.UndoMove();
         }
-    }
-    public static int GetDirectionIndex(int start, int target)
-    {
-        int startFile = start % 8, startRank = start / 8;
-        int targetFile = target % 8, targetRank = target / 8;
-
-        int fileDiff = targetFile - startFile;
-        int rankDiff = targetRank - startRank;
-
-        // Normalize differences to -1, 0, or 1
-        int dirX = Math.Sign(fileDiff);
-        int dirY = Math.Sign(rankDiff);
-
-        // If they aren't on the same line/diagonal, they aren't aligned
-        if (fileDiff != 0 && rankDiff != 0 && Math.Abs(fileDiff) != Math.Abs(rankDiff))
-            return -1; 
-
-        // Mapping to your indices:
-        // Assuming 0: North (+8), 1: South (-8), 2: West (-1), 3: East (+1)
-        // Assuming 4: NW (+7), 5: SE (-7), 6: NE (+9), 7: SW (-9)
-        if (dirX == 0 && dirY == 1)  return 0; // North
-        if (dirX == 0 && dirY == -1) return 1; // South
-        if (dirX == -1 && dirY == 0) return 2; // West
-        if (dirX == 1 && dirY == 0)  return 3; // East
-        
-        if (dirX == -1 && dirY == 1)  return 4; // NW
-        if (dirX == 1 && dirY == -1)  return 5; // SE
-        if (dirX == 1 && dirY == 1)   return 6; // NE
-        if (dirX == -1 && dirY == -1) return 7; // SW
-
-        return -1;
+        return validCount;
     }
 }

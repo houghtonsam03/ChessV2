@@ -1,23 +1,24 @@
-public class Move
+using System;
+
+public readonly struct Move
 {
-    public readonly int StartSquare;
-    public readonly int TargetSquare;
-    public readonly int promotionPiece;
-    public readonly bool castling;
-    public readonly bool enpassant;
-    public Move(int start,int target,int promotion=0,bool cast=false,bool enpass=false)
+    public static readonly Move NullMove = new Move(0, 0, MoveFlags.None);
+    // Pack everything into 16 bits: 
+    // From (6 bits) | To (6 bits) | Flags (4 bits)
+    public readonly ushort Value;
+
+    public byte From => (byte)(Value & 0x3F);
+    public byte To => (byte)((Value >> 6) & 0x3F);
+    public MoveFlags Flags => (MoveFlags)(Value >> 12);
+
+    public Move(int from, int to, MoveFlags flags = MoveFlags.None)
     {
-        StartSquare = start;
-        TargetSquare = target;
-        promotionPiece = promotion;
-        castling = cast;
-        enpassant = enpass;
+        Value = (ushort)(from | (to << 6) | ((int)flags << 12));
     }
+
     public static bool operator ==(Move mv1,Move mv2)
     {
-        return  (mv1.StartSquare == mv2.StartSquare) &&
-                (mv1.TargetSquare == mv2.TargetSquare) &&
-                (mv1.promotionPiece == mv2.promotionPiece);
+        return  mv1.Value == mv2.Value;
     }
     public static bool operator !=(Move mv1,Move mv2)
     {
@@ -29,18 +30,49 @@ public class Move
     }
     public override int GetHashCode()
     {
-        return (StartSquare << 6) ^ TargetSquare;
+        return (From << 6) ^ To;
+    }
+    public bool IsCastling()
+    {
+        return Flags == MoveFlags.Castling;
+    }
+    public bool IsEnPassant()
+    {
+        return Flags == MoveFlags.EnPassant;
+    }
+    public bool IsPromotion()
+    {
+        return (int)Flags >= (int)MoveFlags.KnightPromotion;
+    }
+    public int GetPromotionPiece()
+    {
+        return Flags switch
+        {
+            MoveFlags.KnightPromotion => Piece.Knight,
+            MoveFlags.BishopPromotion => Piece.Bishop,
+            MoveFlags.RookPromotion => Piece.Rook,
+            MoveFlags.QueenPromotion => Piece.Queen,
+            _ => Piece.None
+        };
+    }
+    public static MoveFlags GetPromotionFlag(int promotionPiece)
+    {
+        if (Piece.IsType(promotionPiece,Piece.Knight)) return MoveFlags.KnightPromotion;
+        else if (Piece.IsType(promotionPiece,Piece.Bishop)) return MoveFlags.BishopPromotion;
+        else if (Piece.IsType(promotionPiece,Piece.Rook)) return MoveFlags.RookPromotion;
+        else if (Piece.IsType(promotionPiece,Piece.Queen)) return MoveFlags.QueenPromotion;
+        return MoveFlags.None;
     }
     public override string ToString()
     {
-        string s = ChessGame.IDToString(StartSquare) + ChessGame.IDToString(TargetSquare);
+        string s = ChessGame.IDToString(From) + ChessGame.IDToString(To);
 
         return s;
     }
     public static string AlgebraicNotation(Move move,bool isCheck,bool isCheckmate,bool isCapture,int movingPiece)
     {
-        if (move.castling && ChessGame.GetRank(move.TargetSquare) == 2) return "O-O-O";
-        else if (move.castling && ChessGame.GetRank(move.TargetSquare) == 6) return "O-O";
+        if (move.IsCastling() && ChessGame.GetRank(move.To) == 2) return "O-O-O";
+        else if (move.IsCastling() && ChessGame.GetRank(move.To) == 6) return "O-O";
         string moveNote = "";
         moveNote += Piece.IsType(movingPiece,Piece.Pawn) ? "" : Piece.ToString(movingPiece);
         if (isCapture) 
@@ -48,14 +80,24 @@ public class Move
             if (Piece.IsType(movingPiece,Piece.Pawn))
             {
                 string[] files = {"a","b","c","d","e","f","g","h"};
-                moveNote += files[ChessGame.GetFile(move.StartSquare)];
+                moveNote += files[ChessGame.GetFile(move.From)];
             }
             moveNote += "x";
         }
-        moveNote += ChessGame.IDToString(move.TargetSquare);
-        if (move.promotionPiece != Piece.None) moveNote += Piece.ToString(move.promotionPiece);
+        moveNote += ChessGame.IDToString(move.To);
+        if (move.IsPromotion()) moveNote += Piece.ToString(move.GetPromotionPiece()+Piece.GetColour(movingPiece));
         if (isCheckmate) moveNote += "#";
         else if (isCheck) moveNote += "+";
         return moveNote; 
     }   
+}
+public enum MoveFlags : byte
+{
+    None = 0,
+    Castling = 1,
+    EnPassant = 2,
+    KnightPromotion = 3,
+    BishopPromotion = 4,
+    RookPromotion = 5,
+    QueenPromotion = 6
 }

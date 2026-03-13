@@ -168,13 +168,9 @@ public class BoardUI : MonoBehaviour
         }
         tiles[cellID].piece.transform.position = IDToWorld(cellID,isFlipped);
     }
-    public void PaintMoves(int startID,List<Move> moves)
+    public void PaintMove(int cellID)
     {
-        Select(startID);
-        foreach (Move move in moves)
-        {
-            tiles[move.TargetSquare].cell.GetComponent<SpriteRenderer>().color = moveColor;
-        }
+        tiles[cellID].cell.GetComponent<SpriteRenderer>().color = moveColor;
     }
     public void Select(int selectID)
     {

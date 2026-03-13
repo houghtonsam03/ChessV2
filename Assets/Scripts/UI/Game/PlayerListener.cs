@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor.EngineDiagnostics;
 using UnityEngine;
@@ -43,6 +44,21 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         isHuman[1] = agents[1] == null;
         isFlipped = flipped;
     }
+    void Update()
+    {
+        if (Keyboard.current.spaceKey.wasPressedThisFrame) DrawBitboard();
+        if (Keyboard.current.enterKey.wasPressedThisFrame)
+        {
+            List<Move> moves = game.GetLegalMoves(4);
+            
+            Debug.Log($"--- Legal Moves for {(turn == 0 ? "White" : "Black")} ---");
+            foreach (Move move in moves)
+            {
+                // This will print the From/To and the raw Value (to check for flag corruption)
+                Debug.Log($"Move : {move} | Flag: {move.Flags} | From: {move.From} | To: {move.To}");
+            }
+        }
+    } 
     public void OnPointerDown(PointerEventData eventData)
     {
         if (gameOver || !isHuman[turn]) {
@@ -132,7 +148,12 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
         if (!game.hasPiece(ID,(turn+1)*8)) return;
         selectedID = ID;
         List<Move> moves = game.GetLegalMoves(ID);
-        board.PaintMoves(ID,moves);
+        board.Select(ID);
+        for (int i=0;i<moves.Count;i++)
+        {
+            int target = moves[i].To;
+            board.PaintMove(target);
+        }
     }
     public void UnSelect()
     {

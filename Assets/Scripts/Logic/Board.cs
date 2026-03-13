@@ -1,9 +1,12 @@
 
 using System;
 using System.Collections.Generic;
+using Unity.Profiling;
 using UnityEditor.EngineDiagnostics;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
+using UnityEngine.InputSystem.Interactions;
+using UnityEngine.Timeline;
 using UnityEngine.UI;
 
 public struct LastMove
@@ -36,7 +39,7 @@ public class Board
     public int fullmove = 1;
     public  bool gameOver = false;
     // Logic variables
-    private List<LastMove> lastMoves;
+    public LastMove[] lastMoves;
     // Bitboards
     public ulong[] bitboards = new ulong[15]; // 0-5 for white 6-11 for black. 12 for white pieces, 13 for black pieces, 14 for all pieces.
     public ulong whiteAttacks;
@@ -47,7 +50,8 @@ public class Board
     // Standard Fenstrings
     public static readonly string startingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     // Hash variables
-    public List<ulong> positionHistory = new List<ulong>();
+    public ulong[] positionHistory;
+    private int positionIndex;
     public ulong zobristKey;
     public Board()
     {
@@ -57,7 +61,9 @@ public class Board
         halfmove = 0;
         fullmove = 1;
         gameOver = false;
-        lastMoves = new List<LastMove>();
+        lastMoves = new LastMove[6000];
+        positionHistory = new ulong[6000];
+        positionIndex = 0;
     }
     public void setPos(string fen)
     {
@@ -109,12 +115,6 @@ public class Board
         }
         bitboards[14] = bitboards[12] | bitboards[13];
 
-        whiteAttacks = GetAttacks(Piece.white);
-        blackAttacks = GetAttacks(Piece.black);
-        whitePins = GetPins(Piece.white);
-        blackPins = GetPins(Piece.black);
-
-
         colourToMove = fenFields[1] == "w" ? Piece.white : Piece.black;
         string cast = fenFields[2];
         castling = new bool[]{false,false,false,false};
@@ -143,48 +143,39 @@ public class Board
         fullmove = fenFields[5].ToCharArray()[0] -'0';
         zobristKey = Zobrist.ZobristHash(this);
 
-        positionHistory = new List<ulong>{zobristKey};
+        positionHistory[positionIndex] = zobristKey;
 
         gameOver = false;
-        lastMoves = new List<LastMove>();
     }
     public void setPos(Board b)
     {
         colourToMove = b.colourToMove;
-        for(int i=0;i<4;i++) {castling[i] = b.castling[i];}
+        b.castling.AsSpan().CopyTo(castling);
         enpassant = b.enpassant;
         halfmove = b.halfmove;
         fullmove = b.fullmove;
         gameOver = b.gameOver;
 
-        bitboards = new ulong[15];
-        for (int i=0;i<15;i++) {bitboards[i] = b.bitboards[i];}
-        zobristKey = Zobrist.ZobristHash(this);
-        positionHistory = new List<ulong>{zobristKey};
+        b.bitboards.AsSpan().CopyTo(bitboards);
+        zobristKey = b.zobristKey;
+        b.positionHistory.AsSpan(0, b.positionIndex + 1).CopyTo(positionHistory);
+        positionIndex = b.positionIndex;
+        b.lastMoves.AsSpan(0, b.positionIndex).CopyTo(lastMoves);
 
         gameOver = false;
-        lastMoves = new List<LastMove>();
-        whiteAttacks = GetAttacks(Piece.white);
-        blackAttacks = GetAttacks(Piece.black);
-        whitePins = GetPins(Piece.white);
-        blackPins = GetPins(Piece.black);
     }
     public void MakeMove(Move move)
     {
         // Board assumes move is possible and legal.
 
         // Bitboard values
-        int capturedPiece = GetPieceType(move.TargetSquare);
-        int movingPiece = GetPieceType(move.StartSquare);
+        int capturedPiece = GetPieceType(move.To);
+        if (move.IsEnPassant()) capturedPiece = Piece.Pawn;
+        int movingPiece = GetPieceType(move.From);
+
         // Record Move
-        if (move.enpassant) {
-            int captureSquare = ChessGame.GetRank(move.StartSquare)*8 + ChessGame.GetFile(move.TargetSquare);
-            capturedPiece = GetPieceType(captureSquare);
-        }
         LastMove lm = new LastMove(move,movingPiece,capturedPiece,castling,enpassant,halfmove,fullmove);
-        lastMoves.Add(lm);
-        int movingPieceIndex = movingPiece-1;
-        int capturedPieceIndex = capturedPiece-1;
+        lastMoves[positionIndex] = lm;
 
         // Zobrist
         if (enpassant >= 0) zobristKey ^= Zobrist.ZobristKeys[12*64+1+4+ChessGame.GetFile(enpassant)];
@@ -196,45 +187,45 @@ public class Board
 
 
         // Make Move
-        if (move.castling)
+        if (move.IsCastling())
         {
             // Move King
-            ToggleMove(0,colourToMove,move.StartSquare);
-            ToggleMove(0,colourToMove,move.TargetSquare);
+            ToggleMove(Piece.King,colourToMove,move.From);
+            ToggleMove(Piece.King,colourToMove,move.To);
             // Move Rook
-            int rank = ChessGame.GetRank(move.StartSquare);
-            int startFile = ChessGame.GetFile(move.TargetSquare) == 2 ? 0 : 7;
-            int targetFile = ChessGame.GetFile(move.TargetSquare) == 2 ? 3 : 5;
+            int rank = ChessGame.GetRank(move.From);
+            int startFile = ChessGame.GetFile(move.To) == 2 ? 0 : 7;
+            int targetFile = ChessGame.GetFile(move.To) == 2 ? 3 : 5;
             int rookStart = rank*8+startFile;
             int rookTarget = rank*8+targetFile;
-            ToggleMove(4,colourToMove,rookStart);
-            ToggleMove(4,colourToMove,rookTarget);
+            ToggleMove(Piece.Rook,colourToMove,rookStart);
+            ToggleMove(Piece.Rook,colourToMove,rookTarget);
         }
-        else if (move.enpassant)
+        else if (move.IsEnPassant())
         {
-            int capturedSquare = ChessGame.GetRank(move.StartSquare) * 8 + ChessGame.GetFile(move.TargetSquare);
+            int capturedSquare = ChessGame.GetRank(move.From) * 8 + ChessGame.GetFile(move.To);
             // Move friendly pawn
-            ToggleMove(1,colourToMove,move.StartSquare);
-            ToggleMove(1,colourToMove,move.TargetSquare);
-            ToggleMove(1,Piece.GetOpponentColour(colourToMove),capturedSquare);
+            ToggleMove(Piece.Pawn,colourToMove,move.From);
+            ToggleMove(Piece.Pawn,colourToMove,move.To);
+            ToggleMove(Piece.Pawn,Piece.GetOpponentColour(colourToMove),capturedSquare);
         
         }
-        else if (move.promotionPiece != 0)
+        else if (move.IsPromotion())
         {
-            ToggleMove(1,colourToMove,move.StartSquare);
-            if (!Piece.IsType(capturedPiece,Piece.None)) ToggleMove(capturedPieceIndex,Piece.GetOpponentColour(colourToMove),move.TargetSquare);
-            ToggleMove(move.promotionPiece-1,colourToMove,move.TargetSquare);
+            ToggleMove(Piece.Pawn,colourToMove,move.From);
+            if (!Piece.IsType(capturedPiece,Piece.None)) ToggleMove(capturedPiece,Piece.GetOpponentColour(colourToMove),move.To);
+            ToggleMove(move.GetPromotionPiece(),colourToMove,move.To);
         }
         else
         {
             // Move pieces
-            ToggleMove(movingPieceIndex,colourToMove,move.StartSquare);
-            if (!Piece.IsType(capturedPiece,Piece.None)) ToggleMove(capturedPieceIndex,Piece.GetOpponentColour(colourToMove),move.TargetSquare);
-            ToggleMove(movingPieceIndex,colourToMove,move.TargetSquare);
+            ToggleMove(movingPiece,colourToMove,move.From);
+            if (!Piece.IsType(capturedPiece,Piece.None)) ToggleMove(capturedPiece,Piece.GetOpponentColour(colourToMove),move.To);
+            ToggleMove(movingPiece,colourToMove,move.To);
             // Update En Passant possible location
-            if (Piece.IsType(movingPiece,Piece.Pawn) && (Math.Abs(move.TargetSquare-move.StartSquare) == 16)) 
+            if (Piece.IsType(movingPiece,Piece.Pawn) && (Math.Abs(move.To-move.From) == 16)) 
             {
-                enpassant = move.StartSquare + 8 * Math.Sign(move.TargetSquare-move.StartSquare);
+                enpassant = move.From + 8 * Math.Sign(move.To-move.From);
                 zobristKey ^= Zobrist.ZobristKeys[12*64+1+4+ChessGame.GetFile(enpassant)];
             }
         }
@@ -252,7 +243,7 @@ public class Board
             if (castling[3]) zobristKey ^= Zobrist.ZobristKeys[12*64+1+3];
             castling[2] = false; castling[3] = false;
         }
-        foreach (int sq in new int[]{move.StartSquare,move.TargetSquare})
+        foreach (int sq in new int[]{move.From,move.To})
         {
             if (sq == 7 && castling[0]) {castling[0] = false; zobristKey ^= Zobrist.ZobristKeys[12*64+1+0];}
             if (sq == 0 && castling[1]) {castling[1] = false; zobristKey ^= Zobrist.ZobristKeys[12*64+1+1];}
@@ -264,60 +255,55 @@ public class Board
         colourToMove = Piece.GetOpponentColour(colourToMove);
         zobristKey ^= Zobrist.ZobristKeys[12*64];
 
-        whiteAttacks = GetAttacks(Piece.white);
-        blackAttacks = GetAttacks(Piece.black);
-        whitePins = GetPins(Piece.white);
-        blackPins = GetPins(Piece.black);
-        
-        positionHistory.Add(zobristKey);
+        positionIndex++;
+        positionHistory[positionIndex] = zobristKey;
     }
     public void UndoMove()
     {
-        if (lastMoves.Count == 0) return;
-        // Get LastMove
-        LastMove lastMove = lastMoves[lastMoves.Count-1];
-        lastMoves.RemoveAt(lastMoves.Count-1);
+        if (positionIndex == 0) return;
+        // Update Zobrist position and get lastmove
+        positionIndex--;
+        zobristKey = positionHistory[positionIndex];
+        LastMove lastMove = lastMoves[positionIndex];
 
-        int movingPieceIndex = lastMove.MovingPiece-1;
-        int capturedPieceIndex = lastMove.CapturedPiece-1;
         int oppColour = Piece.GetOpponentColour(colourToMove);
-        if (lastMove.Move.castling)
+        if (lastMove.Move.IsCastling())
         {
             // Revert King
-            ToggleMove(0,oppColour,lastMove.Move.StartSquare,false);
-            ToggleMove(0,oppColour,lastMove.Move.TargetSquare,false);
+            ToggleMove(Piece.King,oppColour,lastMove.Move.From,false);
+            ToggleMove(Piece.King,oppColour,lastMove.Move.To,false);
             // Revert Rook
-            int startFile = (lastMove.Move.TargetSquare-lastMove.Move.StartSquare) > 0 ? 7 : 0;
-            int targetFile = (lastMove.Move.TargetSquare-lastMove.Move.StartSquare) > 0 ? 5 : 3;
-            int rank = ChessGame.GetRank(lastMove.Move.StartSquare);
+            int startFile = (lastMove.Move.To-lastMove.Move.From) > 0 ? 7 : 0;
+            int targetFile = (lastMove.Move.To-lastMove.Move.From) > 0 ? 5 : 3;
+            int rank = ChessGame.GetRank(lastMove.Move.From);
             int rookStart = rank*8+startFile;
             int rookTarget = rank*8+targetFile;
-            ToggleMove(4,oppColour,rookStart,false);
-            ToggleMove(4,oppColour,rookTarget,false);
+            ToggleMove(Piece.Rook,oppColour,rookStart,false);
+            ToggleMove(Piece.Rook,oppColour,rookTarget,false);
 
             
         }
-        else if (lastMove.Move.enpassant)
+        else if (lastMove.Move.IsEnPassant())
         {
-            int capturedSquare = ChessGame.GetRank(lastMove.Move.StartSquare) * 8 + ChessGame.GetFile(lastMove.Move.TargetSquare);
+            int capturedSquare = ChessGame.GetRank(lastMove.Move.From) * 8 + ChessGame.GetFile(lastMove.Move.To);
             // Revert move
-            ToggleMove(1,oppColour,lastMove.Move.StartSquare,false);
-            ToggleMove(1,oppColour,lastMove.Move.TargetSquare,false);
-            ToggleMove(1,colourToMove,capturedSquare,false);
+            ToggleMove(Piece.Pawn,oppColour,lastMove.Move.From,false);
+            ToggleMove(Piece.Pawn,oppColour,lastMove.Move.To,false);
+            ToggleMove(Piece.Pawn,colourToMove,capturedSquare,false);
         }
-        else if (lastMove.Move.promotionPiece != 0)
+        else if (lastMove.Move.IsPromotion())
         {
             // Remove promoted and recreate pawn
-            ToggleMove(1,oppColour,lastMove.Move.StartSquare,false);
-            if (!Piece.IsType(lastMove.CapturedPiece,Piece.None)) ToggleMove(capturedPieceIndex,colourToMove,lastMove.Move.TargetSquare,false);
-            ToggleMove(lastMove.Move.promotionPiece-1,oppColour,lastMove.Move.TargetSquare,false);
+            ToggleMove(Piece.Pawn,oppColour,lastMove.Move.From,false);
+            if (!Piece.IsType(lastMove.CapturedPiece,Piece.None)) ToggleMove(lastMove.CapturedPiece,colourToMove,lastMove.Move.To,false);
+            ToggleMove(lastMove.Move.GetPromotionPiece(),oppColour,lastMove.Move.To,false);
         }
         else
         {
             // Revert move
-            ToggleMove(movingPieceIndex,oppColour,lastMove.Move.StartSquare,false);
-            if (!Piece.IsType(lastMove.CapturedPiece,Piece.None)) ToggleMove(capturedPieceIndex,colourToMove,lastMove.Move.TargetSquare,false);
-            ToggleMove(movingPieceIndex,oppColour,lastMove.Move.TargetSquare,false);
+            ToggleMove(lastMove.MovingPiece,oppColour,lastMove.Move.From,false);
+            if (!Piece.IsType(lastMove.CapturedPiece,Piece.None)) ToggleMove(lastMove.CapturedPiece,colourToMove,lastMove.Move.To,false);
+            ToggleMove(lastMove.MovingPiece,oppColour,lastMove.Move.To,false);
         }
         // Update variables
         castling[0] = lastMove.Castling[0]; castling[1] = lastMove.Castling[1]; castling[2] = lastMove.Castling[2]; castling[3] = lastMove.Castling[3];
@@ -325,25 +311,20 @@ public class Board
         halfmove = lastMove.HalfMove;
         fullmove = lastMove.FullMove;
         colourToMove = Piece.GetOpponentColour(colourToMove);
-
-        whiteAttacks = GetAttacks(Piece.white);
-        blackAttacks = GetAttacks(Piece.black);
-        whitePins = GetPins(Piece.white);
-        blackPins = GetPins(Piece.black);
-
-        // Update Zobrist positions
-        positionHistory.RemoveAt(positionHistory.Count-1);
-        zobristKey = positionHistory[positionHistory.Count-1];
-
     }
-    public void ToggleMove(int pieceIndex, int colour,int cell,bool hashing=true)
+    public void ToggleMove(int piece, int colour,int cell,bool hashing=true)
     {
+        if (piece <= 0 || piece > 6) 
+        {
+            Debug.LogError($"Invalid Piece Toggle: Type {piece} of colour {colour} on cell {cell} | Lastmove: {lastMoves[positionIndex-1].MovingPiece} | Board: {this}");
+        }
         int offset = Piece.IsColour(colour,Piece.white) ? 0 : 6;
         int team = Piece.IsColour(colour,Piece.white) ? 12 : 13;
-        Bitboard.ToggleBit(ref bitboards[pieceIndex+offset],cell);
+        int pIndex = piece-1;
+        Bitboard.ToggleBit(ref bitboards[pIndex+offset],cell);
         Bitboard.ToggleBit(ref bitboards[team],cell);
         Bitboard.ToggleBit(ref bitboards[14],cell);
-        if (hashing) zobristKey ^= Zobrist.ZobricPositionHash(pieceIndex+offset,cell);
+        if (hashing) zobristKey ^= Zobrist.ZobricPositionHash(pIndex+offset,cell);
     }
     public int FindKing(int colour)
     {
@@ -357,6 +338,7 @@ public class Board
 
         return Bitboard.PopLowestBit(ref king);
     }
+
     public int GetPieceType(int square) 
     {
         ulong mask = 1UL << square;
@@ -491,8 +473,37 @@ public class Board
     public bool IsAttacked(int square,int colour)
     {
         // Is attacked by side COLOUR.
-        ulong attacked = Piece.IsColour(colour,Piece.white) ? whiteAttacks : blackAttacks;
-        return Bitboard.HasBit(attacked,square);
+        int attackerOffset = colour == Piece.white ? 0 : 6;
+        // Kings
+        if ((MoveGenerator.KingAttacks[square] & bitboards[0+attackerOffset]) != 0) return true;
+        // Pawns
+        int team = colour == Piece.white ? 1 : 0;
+        if ((MoveGenerator.PawnAttacks[(square*2)+team] & bitboards[1+attackerOffset]) != 0) return true;
+        // Knight
+        if ((MoveGenerator.KnightAttacks[square] & bitboards[2+attackerOffset]) != 0) return true;
+        // Sliders
+        ulong enemyBishopsQueens = bitboards[3 + attackerOffset] | bitboards[5 + attackerOffset];
+        if (enemyBishopsQueens != 0)
+        {
+            // Magic lookup for diagonals from 'square'
+            ulong bishopBlockers = bitboards[14] & MoveGenerator.BishopAttacks[square];
+            int bishopIndex = (int)((bishopBlockers * MoveGenerator.BishopMagics[square]) >> MoveGenerator.BishopShifts[square]);
+            ulong bishopMask = MoveGenerator.BishopTable[MoveGenerator.BishopOffsets[square] + bishopIndex];
+            
+            if ((bishopMask & enemyBishopsQueens) != 0) return true;
+        }
+        // Check Rook/Queen (Orthogonals)
+        ulong enemyRooksQueens = bitboards[4 + attackerOffset] | bitboards[5 + attackerOffset];
+        if (enemyRooksQueens != 0)
+        {
+            // Magic lookup for orthogonals from 'square'
+            ulong rookBlockers = bitboards[14] & MoveGenerator.RookAttacks[square];
+            int rookIndex = (int)((rookBlockers * MoveGenerator.RookMagics[square]) >> MoveGenerator.RookShifts[square]);
+            ulong rookMask = MoveGenerator.RookTable[MoveGenerator.RookOffsets[square] + rookIndex];
+            
+            if ((rookMask & enemyRooksQueens) != 0) return true;
+        }
+        return false;
     }
     public bool IsCheck(int colour)
     {
@@ -505,7 +516,8 @@ public class Board
         // White Win - 1,2,3
         // Black Win - 4,5,6
         // Draw - 7,8,9,10,11,12
-        bool hasMoves = MoveGenerator.GenerateMoves(this,colourToMove).Count != 0;
+        Span<Move> moves = stackalloc Move[256];
+        bool hasMoves = MoveGenerator.GenerateMoves(this,colourToMove,moves) != 0;
         
         if (IsCheckMate(hasMoves,colourToMove)) return Piece.IsColour(colourToMove,Piece.black) ? 1 : 4;
         if (IsResigned()) return Piece.IsColour(colourToMove,Piece.black) ? 2 : 5;
@@ -517,7 +529,7 @@ public class Board
         if (IsAgreement()) return 11;
         if (IsTimeout(colourToMove,whiteTime,blackTime) == 2) return 12;
         return 0;
-        
+
     } 
     public bool IsCheckMate(bool hasMoves,int colour)
     {
@@ -576,6 +588,7 @@ public class Board
         }
         return false;
     }
+
     public bool IsFiftyMoveRule()
     {
         return halfmove >= 100; // 50 for each player
@@ -583,7 +596,7 @@ public class Board
     public bool IsRepetition()
     {
         int count = 0;
-        for (int i=positionHistory.Count-1;i>=0;i--)
+        for (int i=positionIndex;i>=0;i--)
         {
             if (positionHistory[i] == zobristKey) count++;
         }
@@ -595,32 +608,33 @@ public class Board
     }
     public override string ToString()
     {
-        string output = "\n";
-        string horizontalLine = new string('-', 24) + "\n"; // Creates "---------------------------------"
+        string output = "";
+        string horizontalLine = new string('-', 35) + "\n"; // Consistent separator
         for (int rank = 7; rank >= 0; rank--)
         {
             output += horizontalLine;
             for (int file = 0;file<=7;file++)
             {
                 int cell = ChessGame.CellToID(file,rank);
-                char c = ' ';
-                if (Bitboard.HasBit(bitboards[0],cell)) c = 'K';
-                else if (Bitboard.HasBit(bitboards[1],cell)) c = 'P';
-                else if (Bitboard.HasBit(bitboards[2],cell)) c = 'N';
-                else if (Bitboard.HasBit(bitboards[3],cell)) c = 'B';
-                else if (Bitboard.HasBit(bitboards[4],cell)) c = 'R';
-                else if (Bitboard.HasBit(bitboards[5],cell)) c = 'Q';
-                else if (Bitboard.HasBit(bitboards[6],cell)) c = 'k';
-                else if (Bitboard.HasBit(bitboards[7],cell)) c = 'p';
-                else if (Bitboard.HasBit(bitboards[8],cell)) c = 'n';
-                else if (Bitboard.HasBit(bitboards[9],cell)) c = 'b';
-                else if (Bitboard.HasBit(bitboards[10],cell)) c = 'r';
-                else if (Bitboard.HasBit(bitboards[11],cell)) c = 'q';
+                string c = " ";
+                if (Bitboard.HasBit(bitboards[0],cell)) c = "K";
+                else if (Bitboard.HasBit(bitboards[1],cell)) c = "P";
+                else if (Bitboard.HasBit(bitboards[2],cell)) c = "N";
+                else if (Bitboard.HasBit(bitboards[3],cell)) c = "B";
+                else if (Bitboard.HasBit(bitboards[4],cell)) c = "R";
+                else if (Bitboard.HasBit(bitboards[5],cell)) c = "Q";
+                else if (Bitboard.HasBit(bitboards[6],cell)) c = "k";
+                else if (Bitboard.HasBit(bitboards[7],cell)) c = "p";
+                else if (Bitboard.HasBit(bitboards[8],cell)) c = "n";
+                else if (Bitboard.HasBit(bitboards[9],cell)) c = "b";
+                else if (Bitboard.HasBit(bitboards[10],cell)) c = "r";
+                else if (Bitboard.HasBit(bitboards[11],cell)) c = "q";
 
-                output += string.Format("| {0} ", c);
+                output += $"| {c,-4}";
             }
+            output += "|\n"; // End of row
         }
-        output += "\n"+horizontalLine; // Final bottom border
+        output += horizontalLine;
         return output;
     }
     public static string BoardToFen(Board b)

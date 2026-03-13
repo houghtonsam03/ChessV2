@@ -10,5 +10,5 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 14c0570a3030906428c94a663d354551, type: 3}
-  m_Name: RandomAgent
-  m_EditorClassIdentifier: Assembly-CSharp::RandomAgent
+  m_Name: Random
+  m_EditorClassIdentifier: Assembly-CSharp::V0_Random

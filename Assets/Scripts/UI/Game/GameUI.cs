@@ -94,7 +94,7 @@ public class GameUI : MonoBehaviour
     {
         playerListener.EndTurn();
 
-        int movingPiece = board.GetPieceType(move.StartSquare);
+        int movingPiece = board.GetPieceType(move.From);
         string moveStr = Move.AlgebraicNotation(move,isCheck,isCheckmate,isCapture,movingPiece);
         rightUI.UpdateHistory(moveStr,board.colourToMove==Piece.white);
 
@@ -103,8 +103,8 @@ public class GameUI : MonoBehaviour
         
 
         if (isCheck) PlaySound(Sound.Check);
-        else if (move.castling) PlaySound(Sound.Castle);
-        else if (move.promotionPiece != 0) PlaySound(Sound.Promotion);
+        else if (move.IsCastling()) PlaySound(Sound.Castle);
+        else if (move.IsPromotion()) PlaySound(Sound.Promotion);
         else if (isCapture) PlaySound(Sound.Capture);
         else if (isWhite) PlaySound(Sound.MoveWhite);
         else if (!isWhite) PlaySound(Sound.MoveBlack);
