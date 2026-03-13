@@ -478,9 +478,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d7930b7c3b92aa54283b591900138c04, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  MoveDelay: 0.3
+  MoveDelay: 0
   Agent1: {fileID: 11400000, guid: 9ffb8a6b4b93d994da2da49e849701a1, type: 2}
-  Agent2: {fileID: 11400000, guid: 9ffb8a6b4b93d994da2da49e849701a1, type: 2}
+  Agent2: {fileID: 11400000, guid: a31cd2393bd032e459dfd6b7a5f78841, type: 2}
 --- !u!4 &1942845421
 Transform:
   m_ObjectHideFlags: 0

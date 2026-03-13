@@ -19,7 +19,9 @@ public class V0_Random : ChessAgent
         Span<Move> moves = stackalloc Move[256];
         int totalMoves = MoveGenerator.GenerateMoves(board,colour,moves);
 
-        Move randMove = moves[UnityEngine.Random.Range(0,totalMoves)];
+        Random rng = new Random();
+        int randomIndex = rng.Next(0,totalMoves);
+        Move randMove = moves[randomIndex];
         return randMove;
     }
     public override float? GetEval(Board board)

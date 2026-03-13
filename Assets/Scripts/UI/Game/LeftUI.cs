@@ -13,6 +13,7 @@ public class LeftUI : MonoBehaviour
     private TextMeshProUGUI blackTimerText;
     private GameObject blackEvalObject;
     private TextMeshProUGUI blackEvalText;
+    public static readonly float textEvalLimit = 20f; 
     public void Setup(float whiteTime, float blackTime,float?[] evals)
     {
         whiteTimerText = this.gameObject.transform.Find("White").Find("Timer").Find("Time").GetComponent<TextMeshProUGUI>();
@@ -44,7 +45,7 @@ public class LeftUI : MonoBehaviour
         float whiteBarHeight = sigmoidEval(whiteEval);
         whiteEvalObject.transform.Find("White").GetComponent<LayoutElement>().flexibleHeight = whiteBarHeight;
         whiteEvalObject.transform.Find("Black").GetComponent<LayoutElement>().flexibleHeight = 1 - whiteBarHeight;
-        if (whiteEval.HasValue) whiteEvalText.text = whiteEval.Value.ToString();
+        if (whiteEval.HasValue && whiteEval.Value < textEvalLimit) whiteEvalText.text = whiteEval.Value.ToString();
         else whiteEvalText.text = "";
         whiteEvalText.gameObject.transform.position = this.transform.position + new Vector3(-0.4f,-3+3.5f*(whiteBarHeight-0.5f),0);
 
@@ -52,7 +53,7 @@ public class LeftUI : MonoBehaviour
         float blackBarHeight = sigmoidEval(blackEval);
         blackEvalObject.transform.Find("Black").GetComponent<LayoutElement>().flexibleHeight = blackBarHeight;
         blackEvalObject.transform.Find("White").GetComponent<LayoutElement>().flexibleHeight = 1 - blackBarHeight;
-        if (blackEval.HasValue) blackEvalText.text = (-blackEval.Value).ToString();
+        if (blackEval.HasValue && blackEval.Value < textEvalLimit) blackEvalText.text = (-blackEval.Value).ToString();
         else blackEvalText.text = "";
         blackEvalText.gameObject.transform.position = this.transform.position + new Vector3(-0.4f,3-3.5f*(blackBarHeight-0.5f),0);
 
@@ -65,7 +66,7 @@ public class LeftUI : MonoBehaviour
     }
     private float sigmoidEval(float? eval)
     {
-        if (eval.HasValue) return 1/(1+Mathf.Exp(-0.2f*eval.Value));
+        if (eval.HasValue) return 1/(1+Mathf.Exp(-0.3f*eval.Value));
         else return 0.5f;
     }
 }

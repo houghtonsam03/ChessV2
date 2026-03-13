@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Unity.Profiling;
 using UnityEditor.EngineDiagnostics;
 using UnityEditor.Experimental.GraphView;
@@ -530,7 +531,13 @@ public class Board
         if (IsTimeout(colourToMove,whiteTime,blackTime) == 2) return 12;
         return 0;
 
-    } 
+    }
+    public bool isDraw(bool hasMoves,int repeats=3)
+    {
+        // Useful for engines.
+        if (IsStaleMate(hasMoves,colourToMove) || IsInsufficientMaterial() || IsFiftyMoveRule() || IsRepetition(repeats)) return true;
+        return false; 
+    }
     public bool IsCheckMate(bool hasMoves,int colour)
     {
         return !hasMoves && IsCheck(colour);
@@ -593,14 +600,26 @@ public class Board
     {
         return halfmove >= 100; // 50 for each player
     }
-    public bool IsRepetition()
+    public bool IsRepetition(int countNeeded = 3)
     {
+        // We only need to check positions where it was the SAME player's turn.
+        // Positions can only repeat every 2 plies (2, 4, 6...).
+        // We check back only as far as the halfmove clock allows.
         int count = 0;
-        for (int i=positionIndex;i>=0;i--)
+        int endSearch = Math.Max(0, positionIndex - halfmove);
+
+        for (int i = positionIndex; i >= endSearch; i -= 2)
         {
-            if (positionHistory[i] == zobristKey) count++;
+            if (positionHistory[i] == zobristKey)
+            {
+                // In search, finding the position even ONCE before 
+                // usually counts as a draw to prevent infinite loops 
+                // and recognize forced draws.
+                count++;
+                if (count>= countNeeded) return true; 
+            }
         }
-        return count >= 3;
+        return false;
     }
     public bool IsAgreement()
     {

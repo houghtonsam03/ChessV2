@@ -11,13 +11,13 @@ public class AgentComparer : MonoBehaviour
     public float TimeLimit;
     public int gameLimit;
     // Agents & Game
-    private ChessAgent[] agents;
     private ChessGame currentGame;
     private GameObject chessObject;
+    private bool p1White;
     // Statistics
-    private int gameCount = 1;
+    private float gameCount = 1;
     private int[] states = new int[12];
-    private int[] stateCounts = new int[4]; // Wins, Draws, Losses, Total
+    private float[] stateCounts = new float[3]; // Wins, Draws, Losses, Total
 
     // Layout Elements
     private LayoutElement[] bars;
@@ -28,9 +28,10 @@ public class AgentComparer : MonoBehaviour
         // Start agents & game
         chessObject = new GameObject("Game");
         currentGame = chessObject.AddComponent<ChessGame>();
-        bool p1White = UnityEngine.Random.value < 0.5f;
+        p1White = UnityEngine.Random.value < 0.5f;
         currentGame.Agent1 = Agent1; currentGame.Agent2 = Agent2;
-        currentGame.Begin(p1White,true,true,TimeLimit,false);
+        currentGame.MoveDelay = 0.0f;
+        currentGame.Begin(p1White,true,true,TimeLimit*60,false);
 
         // Get Elements
         bars = new LayoutElement[3];
@@ -48,10 +49,11 @@ public class AgentComparer : MonoBehaviour
         int endState = currentGame.GetEndState();
         if (endState != 0 && gameCount <= gameLimit)
         {
-            gameCount++;
             states[endState]++;
             UpdateBar(endState);
-            bool p1White = UnityEngine.Random.value < 0.5f;
+
+            gameCount++;
+            p1White = UnityEngine.Random.value < 0.5f;
             currentGame.Rematch(p1White);
             Debug.Log(ChessGame.StringState(endState));
         }
@@ -60,20 +62,19 @@ public class AgentComparer : MonoBehaviour
     {
         if (1 <= newState && newState <= 3) 
         {
-            stateCounts[0]++;
-            stateCounts[3]++;
+            if (p1White) stateCounts[0]++;
+            else stateCounts[2]++;
         }
         if (4 <= newState && newState <= 6)
         {
-            stateCounts[2]++;
-            stateCounts[3]++;
+            if (p1White) stateCounts[2]++;
+            else stateCounts[0]++;
         }
         if (7 <= newState && newState <= 12) 
         {
-            stateCounts[1]++;
-            stateCounts[3]++;    
+            stateCounts[1]++;   
         }
-        float[] proportions = new float[3]{(float)stateCounts[0]/stateCounts[3],(float)stateCounts[1]/stateCounts[3],(float)stateCounts[2]/stateCounts[3]};
+        float[] proportions = new float[3]{stateCounts[0]/gameCount,stateCounts[1]/gameCount,stateCounts[2]/gameCount};
         for (int i=0;i<3;i++)
         {
             bars[i].flexibleWidth = proportions[i];

@@ -84,8 +84,8 @@ public class ChessGame : MonoBehaviour
     }
     public void Rematch(bool p1White)
     {
-        gameFen = Board.startingFen;
-        board.setPos(gameFen);
+        board = new Board();
+        board.setPos(Board.startingFen);
 
         player1White = p1White;
         turnIndex = 0;

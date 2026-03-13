@@ -15,7 +15,8 @@ public class V1_MinMax : ChessAgent
     private int depth;
     // Static values
     private static int[] pieceScores = {0,1,3,3,5,9};
-    private static float checkmateValue = 100;
+    public static readonly float checkmateValue = 100f;
+    public static readonly float drawValue = 0f;
     public override void StartAgent(bool white)
     {
         colour = white ? Piece.white : Piece.black;
@@ -52,7 +53,11 @@ public class V1_MinMax : ChessAgent
         Span<Move> moves = stackalloc Move[256];
         int totalMoves = MoveGenerator.GenerateMoves(board,board.colourToMove,moves);
 
+        if (board.IsCheckMate(totalMoves > 0,board.colourToMove)) return -checkmateValue; // I am in checkmate -> Bad
+        else if (board.isDraw(totalMoves > 0,3)) return drawValue;
+
         if (depth == 0) return Evaluation(board,totalMoves);
+
         float bestScore = float.MinValue;
         for (int i=0;i<totalMoves;i++)
         {
@@ -66,11 +71,9 @@ public class V1_MinMax : ChessAgent
     }
     private float Evaluation(Board board,int moveCount)
     {
-        float score = 0;
-        bool hasMoves = moveCount > 0;
-        if (!hasMoves && board.IsCheck(board.colourToMove)) return checkmateValue;
-        if (!hasMoves && !board.IsCheck(board.colourToMove)) return 0f;
         int offset = Piece.IsColour(board.colourToMove,Piece.white) ? 0 : 6;
+
+        float score = 0;
         for (int i=0;i<6;i++)
         {
             score += Bitboard.Count(board.bitboards[i+offset])*pieceScores[i];
