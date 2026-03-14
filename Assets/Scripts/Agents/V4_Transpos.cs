@@ -7,17 +7,29 @@ using UnityEngine.SocialPlatforms.Impl;
 using Math = System.Math;
 using Random = System.Random;
 
-// Agent V2 - Piece Square Tables
-// Agent implements MinMax search (NegaMax) [Depth = 2]
-// Evaluates positions based on piece counts and piece square tables (PST).
-[CreateAssetMenu(fileName = "PieceSquareTables", menuName = "Agents/PieceSquareTables")]
-public class V2_PieceTables : ChessAgent
+// Agent V4 - Transposition Tables
+// Agent implements MinMax search (NegaMax) with Alpha-Beta-Pruning and Transposition Tables [Depth = 3]
+// Evaluates positions based on piece counts and Piece Square Tables (PST)
+[CreateAssetMenu(fileName = "TranspositionTables", menuName = "Agents/TranspositionTables")]
+public class V4_Transpos : ChessAgent
 {
     // Random
     private static readonly Random rng = new Random();
     // Game Information
     private int colour;
+    // Agent variables
+    private State[] TransposTable;
+    private struct State
+    {
+        public ulong Zobrist;
+        public Move move;
+        public float score;
+        public byte depth;
+        public byte nodeType; // 0 = Exact, 1 = Alpha (Upper-Bound), 2 = Beta (Lower-Bound)
+    }
     // Static values
+    private static readonly int TableSize = 1 << 20; // 1,048,576 entries
+    private static readonly int IndexMask = TableSize - 1;
     private static readonly int[] pieceScores = {0,100,320,330,500,900}; // Centipawns i.e 100 = 1 Pawn
     private static readonly int endgameStart = 75;
     // PST Tables are for WHITE and visually flipped on y-axis
@@ -101,67 +113,142 @@ public class V2_PieceTables : ChessAgent
 
     public static readonly float checkmateValue = 100000f; //1e5
     public static readonly float drawValue = 0f;
-    public static readonly  int depth = 2;
+    public static readonly int depth = 3;
     public override void StartAgent(bool white)
     {
         colour = white ? Piece.white : Piece.black;
+        TransposTable = new State[TableSize];
     }
     public override Move GetMove(Board board)
     {
+
+        // Check lookup table
+        int index = (int)(board.zobristKey & (ulong)IndexMask);
+        State entry = TransposTable[index];
+
+        if (entry.Zobrist == board.zobristKey && entry.depth >= depth && entry.nodeType == 0) return entry.move;
+
+        // Generate moves
         Span<Move> moves = stackalloc Move[256];
         int totalMoves = MoveGenerator.GenerateMoves(board,colour,moves);
 
-        if (totalMoves == 0) return Move.NullMove;
-
-        float bestScore = float.MinValue;
-        Move bestMove = moves[0];
-        // Random ordering
-        for (int i = totalMoves - 1; i > 0; i--)
+        // MOVE ORDERING: Find the TT move in our list and swap it to index 0
+        if (entry.Zobrist == board.zobristKey)
         {
-            int j = rng.Next(i + 1);
-            Move temp = moves[i];
-            moves[i] = moves[j];
-            moves[j] = temp;
+            for (int i = 0; i < totalMoves; i++)
+            {
+                if (moves[i] == entry.move) 
+                {
+                    Move temp = moves[0];
+                    moves[0] = moves[i];
+                    moves[i] = temp;
+                    break;
+                }
+            }
         }
+
+        float alpha = float.NegativeInfinity;
+        float beta = float.PositiveInfinity;
+        float bestScore = float.MinValue;
+        Move bestMove = entry.move;
 
         for (int i=0;i<totalMoves;i++)
         {
             Move move = moves[i];
             board.MakeMove(move);
-            float score = -NegaMax(board,depth-1); // Since first depth is in this function (-1)
+            float score = -NegaMaxAlphaBeta(board,depth-1,-beta,-alpha); // Since first depth is in this function (-1)
             board.UndoMove();
-            if (score > bestScore)
+            if (score > bestScore)  
             {
                 bestScore = score;
                 bestMove = move;
+                if (score > alpha) alpha = score;
             }
+            if (score >= beta) return bestMove;
         }
+
+
         return bestMove;
     }
     public override float? GetEval(Board board)
     {
-        float score = NegaMax(board,depth);
+
+        float score = NegaMaxAlphaBeta(board,depth,float.NegativeInfinity,float.PositiveInfinity);
         return Piece.IsColour(board.colourToMove,colour) ? score/100 : -score/100;
     }
-    private float NegaMax(Board board,int depth)
+    private float NegaMaxAlphaBeta(Board board,int depth,float alpha,float beta)
     {
+        float originAlpha = alpha;
+        // Check if position is in lookup table
+        int index = (int)(board.zobristKey & (ulong)IndexMask);
+        State entry = TransposTable[index];
+
+        if (entry.Zobrist == board.zobristKey && entry.depth >= depth) 
+        {
+            // Adjust checkmate by current depth search
+            float storedScore = entry.score;
+            if (storedScore > checkmateValue - 1000) storedScore -= depth;
+            else if (storedScore < -checkmateValue + 1000) storedScore += depth;
+
+            // Exact
+            if (entry.nodeType == 0) return storedScore;
+            // Upper Bound
+            if (entry.nodeType == 1 && entry.score <= alpha) return alpha;
+            // Lower Bound
+            if (entry.nodeType == 2 && entry.score >= beta) return beta;
+        }
+        // Generate moves
         Span<Move> moves = stackalloc Move[256];
         int totalMoves = MoveGenerator.GenerateMoves(board,board.colourToMove,moves);
+        
+        // Check gameover states
+        if (board.IsCheckMate(totalMoves > 0,board.colourToMove)) {UpdateTransTable(board.zobristKey,Move.NullMove,-checkmateValue,(byte)depth,0);return -checkmateValue-depth;} // I am in checkmate -> Bad
+        else if (board.isDraw(totalMoves > 0,3)) {UpdateTransTable(board.zobristKey,Move.NullMove,drawValue,(byte)depth,0);return drawValue;}
 
-        if (board.IsCheckMate(totalMoves > 0,board.colourToMove)) return -(checkmateValue-board.fullmove); // I am in checkmate -> Bad
-        else if (board.isDraw(totalMoves > 0,3)) return drawValue;
-
+        // Evaluate leaf nodes
         if (depth == 0) return Evaluation(board);
 
+        // MOVE ORDERING: Find the TT move in our list and swap it to index 0
+        if (entry.Zobrist == board.zobristKey)
+        {
+            for (int i = 0; i < totalMoves; i++)
+            {
+                if (moves[i] == entry.move) 
+                {
+                    Move temp = moves[0];
+                    moves[0] = moves[i];
+                    moves[i] = temp;
+                    break;
+                }
+            }
+        }
+
+        // Search through child nodes
         float bestScore = float.MinValue;
+        Move bestMove = moves[0];
         for (int i=0;i<totalMoves;i++)
         {
             Move move = moves[i];
             board.MakeMove(move);
-            float score = -NegaMax(board,depth-1);
+            float score = -NegaMaxAlphaBeta(board,depth-1,-beta,-alpha);
             board.UndoMove();
-            if (score > bestScore) bestScore = score;
+
+            if (score > bestScore) {bestScore = score; bestMove = move;}
+            if (score > alpha) alpha = score;
+            
+            if (score >= beta) {
+                // Adjust checkmate by current depth search
+                float scoreToStore = bestScore;
+                if (scoreToStore > checkmateValue - 1000) scoreToStore += depth;
+                else if (scoreToStore < -checkmateValue + 1000) scoreToStore -= depth;
+
+                UpdateTransTable(board.zobristKey,bestMove,bestScore,(byte)depth,2);
+                return bestScore;
+            }
+
         }
+        byte nodeType = (bestScore <= originAlpha) ? (byte)1 : (byte)0;
+        UpdateTransTable(board.zobristKey,bestMove,bestScore,(byte)depth,nodeType);
         return bestScore;
     }
     private float Evaluation(Board board)
@@ -211,5 +298,23 @@ public class V2_PieceTables : ChessAgent
     private int GetPSTIndex(int colour, int square)
     {
         return Piece.IsColour(colour,Piece.white) ? square : square ^ 56;
+    }
+    private void UpdateTransTable(ulong key,Move m,float sc,byte d,byte nType)
+    {
+        int index = (int)(key & (ulong)IndexMask);
+        State entry = TransposTable[index];
+
+        // Replacement strategy: Only overwrite if search was deeper or position is new
+        if (key != entry.Zobrist || d >= entry.depth)
+        {
+            TransposTable[index] = new State
+            {
+                Zobrist = key,
+                move = m,
+                score = sc,
+                depth = d,
+                nodeType = nType,
+            };
+        }
     }
 }

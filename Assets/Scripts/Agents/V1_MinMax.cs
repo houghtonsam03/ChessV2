@@ -7,7 +7,7 @@ using UnityEngine.SocialPlatforms.Impl;
 using Random = System.Random;
 
 // Agent V1 - Naive MinMax
-// Agent implements MinMax search (NegaMax) [Depth = 3]
+// Agent implements MinMax search (NegaMax) [Depth = 2]
 //  Evaluates positions based on piece counts
 [CreateAssetMenu(fileName = "MinMax", menuName = "Agents/MinMax")]
 public class V1_MinMax : ChessAgent

@@ -45,7 +45,7 @@ public class LeftUI : MonoBehaviour
         float whiteBarHeight = sigmoidEval(whiteEval);
         whiteEvalObject.transform.Find("White").GetComponent<LayoutElement>().flexibleHeight = whiteBarHeight;
         whiteEvalObject.transform.Find("Black").GetComponent<LayoutElement>().flexibleHeight = 1 - whiteBarHeight;
-        if (whiteEval.HasValue && whiteEval.Value < textEvalLimit) whiteEvalText.text = whiteEval.Value.ToString();
+        if (whiteEval.HasValue && Math.Abs(whiteEval.Value) < textEvalLimit) whiteEvalText.text = whiteEval.Value.ToString("F2");
         else whiteEvalText.text = "";
         whiteEvalText.gameObject.transform.position = this.transform.position + new Vector3(-0.4f,-3+3.5f*(whiteBarHeight-0.5f),0);
 
@@ -53,7 +53,7 @@ public class LeftUI : MonoBehaviour
         float blackBarHeight = sigmoidEval(blackEval);
         blackEvalObject.transform.Find("Black").GetComponent<LayoutElement>().flexibleHeight = blackBarHeight;
         blackEvalObject.transform.Find("White").GetComponent<LayoutElement>().flexibleHeight = 1 - blackBarHeight;
-        if (blackEval.HasValue && blackEval.Value < textEvalLimit) blackEvalText.text = (-blackEval.Value).ToString();
+        if (blackEval.HasValue && Math.Abs(blackEval.Value) < textEvalLimit) blackEvalText.text = (-blackEval.Value).ToString("F2");
         else blackEvalText.text = "";
         blackEvalText.gameObject.transform.position = this.transform.position + new Vector3(-0.4f,3-3.5f*(blackBarHeight-0.5f),0);
 

@@ -8,7 +8,7 @@ using Math = System.Math;
 using Random = System.Random;
 
 // Agent V3 - Alpha Beta Pruning
-// Agent implements MinMax search (NegaMax) with Alpha-Beta-Pruning [Depth = 4]
+// Agent implements MinMax search (NegaMax) with Alpha-Beta-Pruning [Depth = 3]
 // Evaluates positions based on piece counts and Piece Square Tables (PST)
 [CreateAssetMenu(fileName = "AlphaBeta", menuName = "Agents/AlphaBeta")]
 public class V3_AlphaBeta : ChessAgent
@@ -116,14 +116,6 @@ public class V3_AlphaBeta : ChessAgent
 
         float bestScore = float.MinValue;
         Move bestMove = moves[0];
-        // Random ordering
-        for (int i = totalMoves - 1; i > 0; i--)
-        {
-            int j = rng.Next(i + 1);
-            Move temp = moves[i];
-            moves[i] = moves[j];
-            moves[j] = temp;
-        }
 
         for (int i=0;i<totalMoves;i++)
         {
@@ -139,6 +131,7 @@ public class V3_AlphaBeta : ChessAgent
             }
             if (score >= beta) return bestMove;
         }
+
         return bestMove;
     }
     public override float? GetEval(Board board)
