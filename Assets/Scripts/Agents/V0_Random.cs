@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using Random = System.Random;
 
+// Agent V0 - Random Moves
+// Base agent where moves are picked at random from possible moves.
 
 [CreateAssetMenu(fileName = "Random", menuName = "Agents/Random")]
 public class V0_Random : ChessAgent
@@ -19,7 +21,7 @@ public class V0_Random : ChessAgent
         Span<Move> moves = stackalloc Move[256];
         int totalMoves = MoveGenerator.GenerateMoves(board,colour,moves);
 
-        Random rng = new Random();
+        Random rng = new Random((int)DateTime.Now.Ticks);
         int randomIndex = rng.Next(0,totalMoves);
         Move randMove = moves[randomIndex];
         return randMove;

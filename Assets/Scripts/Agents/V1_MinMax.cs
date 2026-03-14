@@ -6,21 +6,22 @@ using UnityEngine;
 using UnityEngine.SocialPlatforms.Impl;
 using Random = System.Random;
 
-
+// Agent V1 - Naive MinMax
+// Agent implements MinMax search (NegaMax) [Depth = 3]
+//  Evaluates positions based on piece counts
 [CreateAssetMenu(fileName = "MinMax", menuName = "Agents/MinMax")]
 public class V1_MinMax : ChessAgent
 {
     // Game Information
     private int colour;
-    private int depth;
     // Static values
-    private static int[] pieceScores = {0,1,3,3,5,9};
-    public static readonly float checkmateValue = 100f;
+    private static readonly int[] pieceScores = {0,1,3,3,5,9};
+    public static readonly float checkmateValue = 150f;
     public static readonly float drawValue = 0f;
+    public static readonly  int depth = 2;
     public override void StartAgent(bool white)
     {
         colour = white ? Piece.white : Piece.black;
-        depth = 3;
     }
     public override Move GetMove(Board board)
     {
@@ -56,7 +57,7 @@ public class V1_MinMax : ChessAgent
         if (board.IsCheckMate(totalMoves > 0,board.colourToMove)) return -checkmateValue; // I am in checkmate -> Bad
         else if (board.isDraw(totalMoves > 0,3)) return drawValue;
 
-        if (depth == 0) return Evaluation(board,totalMoves);
+        if (depth == 0) return Evaluation(board);
 
         float bestScore = float.MinValue;
         for (int i=0;i<totalMoves;i++)
@@ -69,7 +70,7 @@ public class V1_MinMax : ChessAgent
         }
         return bestScore;
     }
-    private float Evaluation(Board board,int moveCount)
+    private float Evaluation(Board board)
     {
         int offset = Piece.IsColour(board.colourToMove,Piece.white) ? 0 : 6;
 

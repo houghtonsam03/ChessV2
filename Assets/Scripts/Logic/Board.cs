@@ -608,7 +608,7 @@ public class Board
         int count = 0;
         int endSearch = Math.Max(0, positionIndex - halfmove);
 
-        for (int i = positionIndex; i >= endSearch; i -= 2)
+        for (int i = positionIndex; i >= endSearch; i--)
         {
             if (positionHistory[i] == zobristKey)
             {
