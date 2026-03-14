@@ -13,6 +13,8 @@ using Random = System.Random;
 [CreateAssetMenu(fileName = "AlphaBeta", menuName = "Agents/AlphaBeta")]
 public class V3_AlphaBeta : ChessAgent
 {
+    // Random
+    private static readonly Random rng = new Random();
     // Game Information
     private int colour;
     // Static values
@@ -109,11 +111,19 @@ public class V3_AlphaBeta : ChessAgent
         Span<Move> moves = stackalloc Move[256];
         int totalMoves = MoveGenerator.GenerateMoves(board,colour,moves);
 
-        float bestScore = float.MinValue;
         float alpha = float.NegativeInfinity;
         float beta = float.PositiveInfinity;
 
+        float bestScore = float.MinValue;
         Move bestMove = moves[0];
+        // Random ordering
+        for (int i = totalMoves - 1; i > 0; i--)
+        {
+            int j = rng.Next(i + 1);
+            Move temp = moves[i];
+            moves[i] = moves[j];
+            moves[j] = temp;
+        }
 
         for (int i=0;i<totalMoves;i++)
         {

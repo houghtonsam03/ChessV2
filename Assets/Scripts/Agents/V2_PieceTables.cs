@@ -13,6 +13,8 @@ using Random = System.Random;
 [CreateAssetMenu(fileName = "PieceSquareTables", menuName = "Agents/PieceSquareTables")]
 public class V2_PieceTables : ChessAgent
 {
+    // Random
+    private static readonly Random rng = new Random();
     // Game Information
     private int colour;
     // Static values
@@ -113,6 +115,14 @@ public class V2_PieceTables : ChessAgent
 
         float bestScore = float.MinValue;
         Move bestMove = moves[0];
+        // Random ordering
+        for (int i = totalMoves - 1; i > 0; i--)
+        {
+            int j = rng.Next(i + 1);
+            Move temp = moves[i];
+            moves[i] = moves[j];
+            moves[j] = temp;
+        }
 
         for (int i=0;i<totalMoves;i++)
         {

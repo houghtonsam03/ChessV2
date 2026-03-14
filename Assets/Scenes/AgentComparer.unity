@@ -530,8 +530,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 56e56c27e4d04534f88f019fbbae2a42, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AgentComparer
-  Agent1: {fileID: 11400000, guid: 9ffb8a6b4b93d994da2da49e849701a1, type: 2}
-  Agent2: {fileID: 11400000, guid: a31cd2393bd032e459dfd6b7a5f78841, type: 2}
+  Agent1: {fileID: 11400000, guid: 21041fd02a5689a4fbb983f939a08978, type: 2}
+  Agent2: {fileID: 11400000, guid: 9ffb8a6b4b93d994da2da49e849701a1, type: 2}
   TimeLimit: 1
   gameLimit: 1000
 --- !u!114 &213351687
