@@ -12,13 +12,13 @@ Working Chess Game made using the unity engine. The project is made as a framewo
 ### Testing frameworks and game
 Different frameworks are available through different scens in Assets/Scenes.
 Changing agents is done through the inspector in unity by adding the correct asset to the corresponding player field. 
-1) Agent Comparer
+#### Agent Comparer  
     Runs a set amount of games between two different (or identical) agents. 
-2) Game
+#### Game  
     Runs a single game between two different (or identical) agents. During startup the user may pick which agent should be which colour, what timerules the game should be using and if an agents should instead be disable and replaced by human input.
-3) Perft Test
+#### Perft Test  
     Tests the current move generators moves.
-4) Magic
+#### Magic  
     Produces Magic bitboard numbers for chess programming optimisation. Press space to export current calculated magic bitboard number.
 ## Plans
 ### Agents
