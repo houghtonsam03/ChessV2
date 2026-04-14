@@ -11,6 +11,7 @@ Working Chess Game made using the unity engine. The project is made as a framewo
 4) Create the asset (Create>Agents>Name) in the Assets/Agents folder.
 ### Testing frameworks and game
 Different frameworks are available through different scens in Assets/Scenes.
+Changing agents is done through the inspector in unity by adding the correct asset to the corresponding player field. 
 1) Agent Comparer
     Runs a set amount of games between two different (or identical) agents. 
 2) Game
