@@ -46,18 +46,6 @@ public class PlayerListener : MonoBehaviour, IPointerDownHandler , IPointerUpHan
     }
     void Update()
     {
-        if (Keyboard.current.spaceKey.wasPressedThisFrame) DrawBitboard();
-        if (Keyboard.current.enterKey.wasPressedThisFrame)
-        {
-            List<Move> moves = game.GetLegalMoves(4);
-            
-            Debug.Log($"--- Legal Moves for {(turn == 0 ? "White" : "Black")} ---");
-            foreach (Move move in moves)
-            {
-                // This will print the From/To and the raw Value (to check for flag corruption)
-                Debug.Log($"Move : {move} | Flag: {move.Flags} | From: {move.From} | To: {move.To}");
-            }
-        }
     } 
     public void OnPointerDown(PointerEventData eventData)
     {

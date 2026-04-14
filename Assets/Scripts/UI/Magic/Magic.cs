@@ -170,7 +170,6 @@ public class Magic : MonoBehaviour
         sb.AppendLine("};");
 
         Debug.Log(sb.ToString());
-        Debug.Log("Magics exported to Console! You can now copy-paste these into your MoveGenerator.");
     }
     private void SaveMagic(int square,ulong magic,int shift,bool isRook)
     {

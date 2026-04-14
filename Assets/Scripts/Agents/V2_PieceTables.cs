@@ -101,6 +101,7 @@ public class V2_PieceTables : ChessAgent
 
     public static readonly float checkmateValue = 100000f; //1e5
     public static readonly float drawValue = 0f;
+    public static readonly float randomMoveMargin = 1f;
     public static readonly  int depth = 2;
     public override void StartAgent(bool white)
     {
@@ -115,28 +116,27 @@ public class V2_PieceTables : ChessAgent
 
         float bestScore = float.MinValue;
         Move bestMove = moves[0];
-        // Random ordering
-        for (int i = totalMoves - 1; i > 0; i--)
-        {
-            int j = rng.Next(i + 1);
-            Move temp = moves[i];
-            moves[i] = moves[j];
-            moves[j] = temp;
-        }
 
+        float[] movesScores = new float[totalMoves];
         for (int i=0;i<totalMoves;i++)
         {
             Move move = moves[i];
             board.MakeMove(move);
-            float score = -NegaMax(board,depth-1); // Since first depth is in this function (-1)
+            movesScores[i] = -NegaMax(board,depth-1); // Since first depth is in this function (-1)
             board.UndoMove();
-            if (score > bestScore)
+            if (movesScores[i] > bestScore)  
             {
-                bestScore = score;
+                bestScore = movesScores[i];
                 bestMove = move;
             }
         }
-        return bestMove;
+        List<Move> candidates = new List<Move>();
+        for (int i=0;i<totalMoves;i++)
+        {
+            if (movesScores[i] >= bestScore-randomMoveMargin) candidates.Add(moves[i]);
+        }
+
+        return candidates[rng.Next(0,candidates.Count)];
     }
     public override float? GetEval(Board board)
     {

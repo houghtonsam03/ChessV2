@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using NUnit.Framework;
 using Unity.Mathematics.Geometry;
 using UnityEngine;
@@ -7,11 +8,11 @@ using UnityEngine.SocialPlatforms.Impl;
 using Math = System.Math;
 using Random = System.Random;
 
-// Agent V3 - Alpha Beta Pruning
-// Agent implements MinMax search (NegaMax) with Alpha-Beta-Pruning [Depth = 3]
+// Agent V4 - Alpha Beta Pruning
+// Agent implements MinMax search (NegaMax) with Alpha-Beta-Pruning and Iterative deepening.
 // Evaluates positions based on piece counts and Piece Square Tables (PST)
 [CreateAssetMenu(fileName = "AlphaBeta", menuName = "Agents/AlphaBeta")]
-public class V3_AlphaBeta : ChessAgent
+public class V4_AlphaBeta : ChessAgent
 {
     // Random
     private static readonly Random rng = new Random();
@@ -101,47 +102,80 @@ public class V3_AlphaBeta : ChessAgent
 
     public static readonly float checkmateValue = 100000f; //1e5
     public static readonly float drawValue = 0f;
-    public static readonly  int depth = 3;
+    public static readonly float randomMoveMargin = 1f;
+    public static readonly float moveTime = 0.3f;
+    public struct SearchTimer
+    {
+        public Stopwatch watch;
+        public bool abandoned;
+    }
     public override void StartAgent(bool white)
     {
         colour = white ? Piece.white : Piece.black;
     }
     public override Move GetMove(Board board)
     {
+        SearchTimer timer = new SearchTimer{watch=Stopwatch.StartNew(),abandoned=false};
         Span<Move> moves = stackalloc Move[256];
         int totalMoves = MoveGenerator.GenerateMoves(board,colour,moves);
 
-        float alpha = float.NegativeInfinity;
-        float beta = float.PositiveInfinity;
+        if (totalMoves == 0) return Move.NullMove;
 
+        float[] movesScores = new float[totalMoves];
+        int maxDepth = 0;
+        // Iterative Deepening
+        for (int depth=1;depth<100;depth++)
+        {
+            float[] depthScoring = new float[totalMoves];
+            for (int i=0;i<totalMoves;i++)
+            {
+                Move move = moves[i];
+                board.MakeMove(move);
+                depthScoring[i] = -NegaMaxAlphaBeta(board,depth-1,float.NegativeInfinity,float.PositiveInfinity,ref timer); // Since first depth is in this function (-1)
+                board.UndoMove();
+            }
+            if (timer.abandoned) break;
+            maxDepth = depth;
+            for (int i=0;i<totalMoves;i++)
+            {
+                movesScores[i] = depthScoring[i];
+            }
+        }
+        // Find best score
         float bestScore = float.MinValue;
-        Move bestMove = moves[0];
-
         for (int i=0;i<totalMoves;i++)
         {
-            Move move = moves[i];
-            board.MakeMove(move);
-            float score = -NegaMaxAlphaBeta(board,depth-1,-beta,-alpha); // Since first depth is in this function (-1)
-            board.UndoMove();
-            if (score > bestScore)  
-            {
-                bestScore = score;
-                bestMove = move;
-                if (score > alpha) alpha = score;
-            }
-            if (score >= beta) return bestMove;
+            if (movesScores[i] > bestScore) bestScore = movesScores[i];
         }
 
-        return bestMove;
+        // Pick move within a margin of best score (random noise)
+        List<Move> candidates = new List<Move>();
+        for (int i=0;i<totalMoves;i++)
+        {
+            if (movesScores[i] >= bestScore-randomMoveMargin) candidates.Add(moves[i]);
+        }
+        UnityEngine.Debug.Log($"Turn: {board.fullmove} - Colour: {colour} -> Depth: {maxDepth}");
+        return candidates[rng.Next(0,candidates.Count)];
     }
     public override float? GetEval(Board board)
     {
-
-        float score = NegaMaxAlphaBeta(board,depth,float.NegativeInfinity,float.PositiveInfinity);
-        return Piece.IsColour(board.colourToMove,colour) ? score/100 : -score/100;
+        SearchTimer timer = new SearchTimer{watch=Stopwatch.StartNew(),abandoned=false};
+        float finalScore = 0f;
+        for (int depth=1;depth<100;depth++)
+        {
+            float score = NegaMaxAlphaBeta(board,depth,float.NegativeInfinity,float.PositiveInfinity,ref timer);
+            if (timer.abandoned) break;
+            finalScore = score;
+        }
+        return Piece.IsColour(board.colourToMove,colour) ? finalScore/100 : -finalScore/100;
     }
-    private float NegaMaxAlphaBeta(Board board,int depth,float alpha,float beta)
+    private float NegaMaxAlphaBeta(Board board,int depth,float alpha,float beta,ref SearchTimer timer)
     {
+        if (timer.watch.Elapsed.TotalSeconds > moveTime)
+        {
+            timer.abandoned = true;
+            return 0; // Search is abandoned
+        }
         Span<Move> moves = stackalloc Move[256];
         int totalMoves = MoveGenerator.GenerateMoves(board,board.colourToMove,moves);
 
@@ -155,13 +189,15 @@ public class V3_AlphaBeta : ChessAgent
         {
             Move move = moves[i];
             board.MakeMove(move);
-            float score = -NegaMaxAlphaBeta(board,depth-1,-beta,-alpha);
+            float score = -NegaMaxAlphaBeta(board,depth-1,-beta,-alpha,ref timer);
             board.UndoMove();
+            
+            if (timer.abandoned) return 0;
 
             if (score > bestScore) bestScore = score;
             if (score > alpha) alpha = score;
             
-            if (score >= beta) return bestScore;
+            if (score >= beta) return score;
 
         }
         return bestScore;
