@@ -4,6 +4,11 @@
 /Logs
 /Temp
 /UserSettings
+/[Aa]ssembly-CSharp.csproj
+/*.csproj
+/*.sln
+/*.unitypackage
+/*.userprefs
 Assets/TextMesh Pro/Examples & Extras.meta
 Assets/TextMesh Pro/Fonts.meta
 Assets/TextMesh Pro/Resources.meta
